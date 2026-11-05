@@ -6,7 +6,10 @@ import { useCart } from "@/components/CartProvider";
 export const dynamic = "force-dynamic";
 
 export default function Checkout() {
-  const { items, subtotal, clear } = useCart();
+  // এখানে fallback বা ডিফল্ট ভ্যালু দেওয়া হলো, যাতে null হলেও এরর না দেয়
+  const cart = useCart() || { items: [], subtotal: 0, clear: () => {} };
+  const { items, subtotal, clear } = cart;
+  
   const [f, setF] = useState({ line: "", phone: "", method: "SSLCOMMERZ" });
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   
