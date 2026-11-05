@@ -4,6 +4,9 @@ import { useEffect, useRef } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 
+// এই লাইনটি যুক্ত করা হলো
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   const initialized = useRef(false);
   const router = useRouter();
@@ -259,7 +262,6 @@ export default function Home() {
       var flvEl = $("#cats"), fi = -1;
       D.forEach(function (d, i) {
         var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>"; 
-        // এখানে TypeScript এররটা ঠিক করা হয়েছে
         if(li.firstChild) (li.firstChild as HTMLElement).onclick = function () { jump(flvEl, i, N); }; 
         if($("#fl")) $("#fl").appendChild(li);
         var e = document.createElement("div"); e.className = "fe"; e.textContent = d.e; if($("#fe")) $("#fe").appendChild(e);

@@ -1,10 +1,15 @@
 "use client";
 import { useState } from "react";
 import { useCart } from "@/components/CartProvider";
+
+// এই লাইনটি যুক্ত করা হলো
+export const dynamic = "force-dynamic";
+
 export default function Checkout() {
   const { items, subtotal, clear } = useCart();
   const [f, setF] = useState({ line: "", phone: "", method: "SSLCOMMERZ" });
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  
   async function pay() {
     setBusy(true); setErr("");
     const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -13,6 +18,7 @@ export default function Checkout() {
     if (!r.ok) return setErr(j.error || "Something went wrong");
     clear(); window.location.href = j.url;
   }
+  
   return (
     <main className="wrap" style={{ maxWidth: 520, paddingTop: 40 }}>
       <h2>Checkout</h2>
