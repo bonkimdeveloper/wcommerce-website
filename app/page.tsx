@@ -27,7 +27,6 @@ export default function Home() {
       var RM = window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         anim = !RM;
       
-      // এখানে r?: any করে দেওয়া হয়েছে (Optional)
       var $ = function (s: any, r?: any) {
           return (r || document).querySelector(s);
         },
@@ -48,7 +47,6 @@ export default function Home() {
 
       function words(el: any) { el.innerHTML = el.textContent.split(" ").map(function (w: any) { return '<span class="w"><span class="wi">' + w + "</span></span>"; }).join(" "); return $$(".wi", el); }
       
-      // এখানেও d?: any করে দেওয়া হয়েছে (Optional)
       function vars(el: any, o: any, d?: any) { if (anim && d !== 0) G.to(el, Object.assign({ duration: d || 0.9, ease: "power2.inOut", overwrite: "auto" }, o)); else Object.keys(o).forEach(function (k) { el.style.setProperty(k, o[k]); }); }
 
       var hdr = $("#hdr");
@@ -211,7 +209,7 @@ export default function Home() {
       var inView = true;
       function go(i: any) {
         i = ((i % N) + N) % N; if (i === cur) return; var d = i - cur; if (d > N / 2) d -= N; if (d < -N / 2) d += N; var dir = d > 0 ? 1 : -1; cur = i; place(true);
-        if (anim && hbs[cur]) G.fromTo(hbs[cur].firstChild, { rotation: dir * 6, scaleX: 0.85 }, { rotation: 0, scaleX: 1, duration: 1.4, ease: "elastic.out(1,.55)" });
+        if (anim && hbs[cur]) G.fromTo(hbs[cur].firstChild as HTMLElement, { rotation: dir * 6, scaleX: 0.85 }, { rotation: 0, scaleX: 1, duration: 1.4, ease: "elastic.out(1,.55)" });
         swapName(dir); colours(0.9); meta(true); if (anim) G.fromTo("#hAdd", { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "back.out(2)", delay: 0.35, overwrite: true }); arm();
       }
       
@@ -260,7 +258,10 @@ export default function Home() {
 
       var flvEl = $("#cats"), fi = -1;
       D.forEach(function (d, i) {
-        var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>"; li.firstChild.onclick = function () { jump(flvEl, i, N); }; if($("#fl")) $("#fl").appendChild(li);
+        var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>"; 
+        // এখানে TypeScript এররটা ঠিক করা হয়েছে
+        if(li.firstChild) (li.firstChild as HTMLElement).onclick = function () { jump(flvEl, i, N); }; 
+        if($("#fl")) $("#fl").appendChild(li);
         var e = document.createElement("div"); e.className = "fe"; e.textContent = d.e; if($("#fe")) $("#fe").appendChild(e);
       });
       var fes = $$(".fe"), ffs = [$("#f1"), $("#f2"), $("#f3")];
