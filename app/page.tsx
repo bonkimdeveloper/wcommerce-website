@@ -26,10 +26,12 @@ export default function Home() {
 
       var RM = window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         anim = !RM;
-      var $ = function (s: any, r: any) {
+      
+      // এখানে r?: any করে দেওয়া হয়েছে (Optional)
+      var $ = function (s: any, r?: any) {
           return (r || document).querySelector(s);
         },
-        $$ = function (s: any, r: any) {
+        $$ = function (s: any, r?: any) {
           return Array.prototype.slice.call((r || document).querySelectorAll(s));
         };
       var root = document.documentElement;
@@ -45,7 +47,9 @@ export default function Home() {
       var N = D.length;
 
       function words(el: any) { el.innerHTML = el.textContent.split(" ").map(function (w: any) { return '<span class="w"><span class="wi">' + w + "</span></span>"; }).join(" "); return $$(".wi", el); }
-      function vars(el: any, o: any, d: any) { if (anim && d !== 0) G.to(el, Object.assign({ duration: d || 0.9, ease: "power2.inOut", overwrite: "auto" }, o)); else Object.keys(o).forEach(function (k) { el.style.setProperty(k, o[k]); }); }
+      
+      // এখানেও d?: any করে দেওয়া হয়েছে (Optional)
+      function vars(el: any, o: any, d?: any) { if (anim && d !== 0) G.to(el, Object.assign({ duration: d || 0.9, ease: "power2.inOut", overwrite: "auto" }, o)); else Object.keys(o).forEach(function (k) { el.style.setProperty(k, o[k]); }); }
 
       var hdr = $("#hdr");
       var handleScroll = function () { if (hdr) hdr.classList.toggle("sc", window.scrollY > 24); };
@@ -87,7 +91,6 @@ export default function Home() {
       if($("#cSc")) $("#cSc").addEventListener("click", closeCart);
       if($("#cBrowse")) $("#cBrowse").addEventListener("click", function () { closeCart(); setTimeout(function () { if($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); }, anim ? 450 : 0); });
       
-      // Checkout Button logic
       if($("#cGo")) $("#cGo").addEventListener("click", function () { 
         var s = bag.reduce(function (a: any, i: any) { return a + i.p * i.q; }, 0);
         if($("#coTotal")) $("#coTotal").textContent = money(s);
@@ -101,21 +104,19 @@ export default function Home() {
         }
       });
 
-      // Close Checkout Modal (FIXED: Unlocks scroll)
       if($("#coClose")) $("#coClose").addEventListener("click", function () {
         if (anim) {
           G.to("#coBox", { y: 20, opacity: 0, duration: 0.3 });
           G.to("#checkoutModal", { opacity: 0, duration: 0.3, onComplete: function() { 
             $("#checkoutModal").hidden = true; 
-            root.classList.remove("lock"); // <--- স্ক্রল আনলক করা হলো
+            root.classList.remove("lock");
           } });
         } else {
           $("#checkoutModal").hidden = true;
-          root.classList.remove("lock"); // <--- স্ক্রল আনলক করা হলো
+          root.classList.remove("lock");
         }
       });
 
-      // Payment Method Selection
       $$(".pay-btn").forEach(function(btn: any) {
         btn.addEventListener("click", function() {
           $$(".pay-btn").forEach(function(b: any) { b.classList.remove("active"); });
@@ -123,19 +124,16 @@ export default function Home() {
         });
       });
 
-      // Confirm Payment
       if($("#payConfirm")) $("#payConfirm").addEventListener("click", function () {
         if($("#coMainBox")) $("#coMainBox").hidden = true;
         if($("#coSuccessBox")) $("#coSuccessBox").hidden = false;
         if (anim) {
           G.fromTo("#coSuccessBox", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(1.5)" });
         }
-        // Clear Cart
         bag = [];
         renderBag();
       });
 
-      // Close Success Box (FIXED: Unlocks scroll)
       if($("#coSuccessClose")) $("#coSuccessClose").addEventListener("click", function () {
         if (anim) {
           G.to("#coBox", { y: 20, opacity: 0, duration: 0.3 });
@@ -143,13 +141,13 @@ export default function Home() {
             $("#checkoutModal").hidden = true; 
             $("#coMainBox").hidden = false;
             $("#coSuccessBox").hidden = true;
-            root.classList.remove("lock"); // <--- স্ক্রল আনলক করা হলো
+            root.classList.remove("lock");
           } });
         } else {
           $("#checkoutModal").hidden = true;
           $("#coMainBox").hidden = false;
           $("#coSuccessBox").hidden = true;
-          root.classList.remove("lock"); // <--- স্ক্রল আনলক করা হলো
+          root.classList.remove("lock");
         }
       });
       
@@ -178,7 +176,6 @@ export default function Home() {
       };
       document.addEventListener("click", handleDocumentClick);
 
-      /* hero carousel */
       var cur = 0, stage = $("#stage"), hName = $("#hName");
       if(stage) stage.innerHTML = D.map(function (d, i) { return '<div class="hb" data-i="' + i + '"><div class="disc"><span>' + d.e + "</span></div></div>"; }).join("");
       var hbs = $$(".hb"), prev = hbs.map(function (_, i) { return rel(i); });
@@ -233,7 +230,6 @@ export default function Home() {
       var handleResize = function () { place(false); };
       window.addEventListener("resize", handleResize);
 
-      /* why */
       var S = [{ n: 500, u: "+", l: "local kitchens", b: "Home cooks, bakeries and farm stalls, all verified before they sell a single plate.", c: 0 },
       { n: 30, u: "min", l: "average delivery", b: "Each kitchen delivers on its own schedule, so food arrives while it is still hot.", c: 1 },
       { n: 0, u: "৳", l: "hidden fees", b: "The price you see is the price you pay. Delivery is shown before checkout.", c: 2 },
@@ -262,7 +258,6 @@ export default function Home() {
       whySet(0, 1);
       if (anim) { G.to("#wV", { y: -18, duration: 2.8, ease: "sine.inOut", yoyo: true, repeat: -1 }); }
 
-      /* categories */
       var flvEl = $("#cats"), fi = -1;
       D.forEach(function (d, i) {
         var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>"; li.firstChild.onclick = function () { jump(flvEl, i, N); }; if($("#fl")) $("#fl").appendChild(li);
@@ -286,7 +281,6 @@ export default function Home() {
       }
       flvSet(0, 1); if($("#fB")) $("#fB").onclick = function () { if($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); };
 
-      /* vendors */
       var V = [["Bhai Bhai Biryani", "🍛", 0, "4.8", "25 min", "৳220"], ["Ammu’s Kitchen", "🥟", 1, "4.7", "30 min", "৳60"], ["Mishti Ghor", "🍮", 2, "4.9", "35 min", "৳90"], ["Green Basket", "🥗", 3, "4.6", "40 min", "৳45"], ["Cha Adda", "🥤", 4, "4.8", "20 min", "৳60"], ["Crust & Co", "🥐", 5, "4.9", "30 min", "৳85"]];
       var trk = $("#trk"), sl = $("#sl");
       if(trk) trk.innerHTML = V.map(function (v: any) { var c = D[v[2]]; return '<article class="card" style="--c:' + c.bg + ";--cd:" + c.deep + '"><div class="ca"><span>' + v[1] + "</span></div><h3>" + v[0] + "</h3><p>★ " + v[3] + " · " + v[4] + " · " + c.k + '</p><div class="cr"><span>from ' + v[5] + '</span><button class="add2" data-add data-n="' + v[0] + '" data-e="' + v[1] + '" data-p="' + v[5].replace(/\D/g, "") + '" data-v="' + c.k + '" aria-label="Add from ' + v[0] + '">Add</button></div></article>'; }).join("");
@@ -310,7 +304,6 @@ export default function Home() {
       if($("#sp")) $("#sp").onclick = function () { setX(X + step(), true); }; 
       if($("#sn")) $("#sn").onclick = function () { setX(X - step(), true); };
 
-      /* account modal */
       var am = $("#am"), amBox = $("#amBox"), amLast: any = null;
       var COPY: any = { customer: ["Sign in", "Sign in or create an account", "Email", "Email me with news and offers"], seller: ["Sell on Khabo", "Create a seller account and open your shop", "Business email", "Email me seller tips and updates"] };
       function amSet(m: any) { var c = COPY[m]; if(am) am.dataset.m = m; if($("#amT")) $("#amT").textContent = c[0]; if($("#amS")) $("#amS").textContent = c[1]; if($("#amE")) $("#amE").placeholder = c[2]; if($("#amE")) $("#amE").setAttribute("aria-label", c[2]); if($("#amCk")) $("#amCk").textContent = c[3]; $$("#amTabs button").forEach(function (b: any) { b.setAttribute("aria-selected", b.dataset.m === m); }); }
@@ -348,13 +341,11 @@ export default function Home() {
         router.push('/dashboard');
       });
 
-      /* marquee */
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
       var set = '<div class="set">' + items.map(function (i) { return "<span>" + i[0] + "</span><i>" + i[1] + "</i>"; }).join("") + "</div>";
       var mqEl = $("#mq"); if(mqEl) mqEl.innerHTML = set + set + set + set;
       function clampV(v: any, a: any, b: any) { return Math.max(a, Math.min(b, v)); }
 
-      /* scroll engine */
       ST.create({ trigger: "#top", start: "top top", end: "bottom top", onToggle: function (s: any) { inView = s.isActive; } });
       ST.create({ trigger: whyEl, start: "top top", end: "bottom bottom", onUpdate: function (s: any) { var i = Math.min(S.length - 1, Math.floor(s.progress * S.length)); if (i !== wi) whySet(i, s.direction || 1); if (anim) G.set($$("#wV>div span"), { rotation: Math.sin(s.progress * Math.PI * 5) * 7 }); } });
       ST.create({ trigger: flvEl, start: "top top", end: "bottom bottom", onUpdate: function (s: any) { var i = Math.min(N - 1, Math.floor(s.progress * N)); if (i !== fi) flvSet(i, s.direction || 1); if($("#fill")) $("#fill").style.transform = "scaleY(" + s.progress + ")"; } });
@@ -491,7 +482,6 @@ export default function Home() {
         .tos{text-align:center;font-size:.85rem;color:#6b6470;margin-top:20px}.tos a{color:inherit}
         .ok{text-align:center;padding:30px 0 6px}.ok svg{width:64px;height:64px;color:var(--deep)}
         
-        /* Checkout Modal CSS */
         .co-modal{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:rgba(23,15,27,.6);backdrop-filter:blur(8px)}
         .co-modal[hidden]{display:none}
         .co-box{background:#fff;border-radius:24px;padding:30px;width:100%;max-width:400px;box-shadow:0 10px 40px rgba(0,0,0,.2);color:var(--ink);position:relative}
@@ -559,7 +549,6 @@ export default function Home() {
             <div class="cfoot" id="cFoot" hidden><div class="csub"><span>Subtotal</span><span id="cSub">৳0</span></div><p id="cNote">Delivery and any discounts are worked out at checkout.</p><button class="btn cgo" id="cGo" type="button">Checkout</button></div>
           </aside></div>
           
-        <!-- নতুন Checkout Modal -->
         <div class="co-modal" id="checkoutModal" hidden>
           <div class="co-box" id="coBox">
             <div id="coMainBox">
