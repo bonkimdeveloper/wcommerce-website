@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton"; // নিচে এই কম্পোনেন্টটি দেওয়া আছে
+import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,11 @@ export default async function Dashboard() {
     redirect("/");
   }
 
-  // ডাটাবেস থেকে ইউজারের আসল ডাটা এবং অর্ডার লিস্ট আনা
-  const dbUser = await db.user.findUnique({ where: { email: user.email! } });
+  // ইমেইলের বদলে ইউজার আইডি দিয়ে ডাটা খোঁজা হচ্ছে (যাতে ফোন লগইনে ক্র্যাশ না করে)
+  const dbUser = await db.user.findUnique({ where: { id: user.id } });
+  
   const orders = await db.order.findMany({
-    where: { userId: dbUser?.id },
+    where: { userId: user.id },
     include: { items: { include: { product: true } } },
     orderBy: { createdAt: "desc" },
   });
@@ -33,7 +34,7 @@ export default async function Dashboard() {
           </div>
           <div>
             <h2 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 700 }}>{dbUser?.name || "User"}</h2>
-            <p style={{ fontSize: "0.8rem", color: "#666", margin: 0 }}>{dbUser?.email}</p>
+            <p style={{ fontSize: "0.8rem", color: "#666", margin: 0 }}>{dbUser?.phone || dbUser?.email}</p>
           </div>
         </div>
 
@@ -59,7 +60,7 @@ export default async function Dashboard() {
       <main style={{ flex: 1, padding: "40px" }}>
         <div style={{ maxWidth: "900px" }}>
           <div style={{ background: "#fff", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", marginBottom: "30px" }}>
-            <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", fontFamily: "var(--fd, sans-serif)" }}>Welcome back, {dbUser?.name?.split(" ")[0]}! 👋</h1>
+            <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", fontFamily: "var(--fd, sans-serif)" }}>Welcome back, {dbUser?.name?.split(" ")[0] || "User"}! 👋</h1>
             <p style={{ color: "#666", margin: 0 }}>Here you can track your recent orders and manage your account.</p>
           </div>
 
