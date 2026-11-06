@@ -333,31 +333,75 @@ export default function Home() {
       };
       document.addEventListener("keydown", handleKeydownAcct);
       
-      // ফোন এবং পাসওয়ার্ড লগইন ফাংশন
-      if($("#amF")) $("#amF").addEventListener("submit", function (e: any) {
+      // Login and registration are separate operations. Registration always creates CUSTOMER.
+      var authMode = "login";
+      var authToggle = document.createElement("button");
+      authToggle.type = "button";
+      authToggle.className = "btn ghost";
+      authToggle.style.width = "100%";
+      authToggle.style.justifyContent = "center";
+      var authForm = $("#amF");
+      if (authForm) authForm.appendChild(authToggle);
+
+      function setAuthMode(mode: string) {
+        authMode = mode;
+        authToggle.textContent = mode === "login" ? "New here? Create an account" : "Already have an account? Sign in";
+        var title = $("#amT");
+        if (title) title.textContent = mode === "login" ? "Sign in" : "Create your account";
+        var submit = authForm?.querySelector('button[type="submit"]');
+        if (submit) submit.textContent = mode === "login" ? "Sign in" : "Create account";
+      }
+      authToggle.addEventListener("click", function () {
+        setAuthMode(authMode === "login" ? "register" : "login");
+        if ($("#amErr")) $("#amErr").textContent = "";
+      });
+
+      // Seller entry starts with a customer account; shop access requires a later admin approval.
+      var originalOpenAcct = openAcct;
+      if ($("#startSell")) $("#startSell").addEventListener("click", function () { setAuthMode("register"); });
+      if ($("#amTabs button")) {
+        $$("#amTabs button").forEach(function (b: any) {
+          b.addEventListener("click", function () {
+            if (b.dataset.m === "seller") setAuthMode("register");
+            else setAuthMode("login");
+          });
+        });
+      }
+      setAuthMode("login");
+
+      if (authForm) authForm.addEventListener("submit", async function (e: any) {
         e.preventDefault();
         var phone = $("#amPhone").value.trim();
-        var pass = $("#amPass").value.trim();
+        var password = $("#amPass").value;
         var err = $("#amErr");
-        var selectedRole = am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
-
-        if (phone.length < 11) {
-          err.textContent = "Please enter a valid phone number (e.g. 01712345678).";
+        var wantsSeller = am?.dataset.m === "seller";
+        if (!/^((\\+?880)?0?1[3-9]\\d{8})$/.test(phone.replace(/[\\s()-]/g, ""))) {
+          err.textContent = "Enter a valid Bangladesh mobile number.";
           return;
         }
-        if (pass.length < 4) {
-          err.textContent = "Password must be at least 4 characters.";
+        if (password.length < 8 || password.length > 72) {
+          err.textContent = "Password must be between 8 and 72 characters.";
           return;
         }
 
         err.textContent = "Please wait...";
-        
-        signIn("credentials", { 
-          phone: phone, 
-          password: pass,
-          role: selectedRole,
-          callbackUrl: "/dashboard" 
-        });
+        var target = wantsSeller ? "/vendor/apply" : "/";
+        try {
+          if (authMode === "register") {
+            var response = await fetch("/api/auth/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ phone: phone, password: password })
+            });
+            var payload = await response.json();
+            if (!response.ok) throw new Error(payload.error || "Registration failed.");
+          }
+          var result = await signIn("credentials", { phone: phone, password: password, redirect: false });
+          if (!result || result.error) throw new Error("Phone number or password is incorrect.");
+          window.location.href = target;
+        } catch (error: any) {
+          err.textContent = error?.message || "Unable to continue. Please try again.";
+        }
       });
 
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
