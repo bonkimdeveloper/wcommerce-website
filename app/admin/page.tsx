@@ -1,28 +1,50 @@
+import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
 export const dynamic = "force-dynamic";
-export default async function Admin() {
-  await requireRole("ADMIN");
-  const [vendors, orders] = await Promise.all([
-    db.vendor.findMany({ include: { user: true }, orderBy: { approved: "asc" } }),
-    db.order.findMany({ include: { user: true }, orderBy: { createdAt: "desc" }, take: 50 }),
-  ]);
-  async function save(fd: FormData) {
-    "use server";
-    await requireRole("ADMIN");
-    await db.vendor.update({ where: { id: String(fd.get("id")) }, data: { approved: fd.get("approved") === "1", commission: Math.min(100, Math.max(0, +fd.get("commission")!)) } });
-    revalidatePath("/admin");
+
+export default async function AdminPage() {
+  const session = await getSession();
+  const user = session?.user as any;
+
+  if (!user || user.role !== "ADMIN") {
+    redirect("/");
   }
+
+  const vendors = await db.vendor.findMany({ include: { user: true } });
+  const orders = await db.order.findMany({
+    include: { user: true, items: { include: { product: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
   return (
-    <main className="wrap" style={{ paddingTop: 32 }}>
-      <h2>Vendors</h2>
-      <table><tbody>{vendors.map((v) => <tr key={v.id}><td>{v.shopName}<br /><small>{v.user.email}</small></td>
-        <td colSpan={2}><form action={save} style={{ display: "flex", gap: 6 }}><input type="hidden" name="id" value={v.id} />
-          <select name="approved" defaultValue={v.approved ? "1" : "0"}><option value="1">Approved</option><option value="0">Pending</option></select>
-          <input name="commission" type="number" defaultValue={v.commission} style={{ width: 80 }} /><button className="btn ghost">Save</button></form></td></tr>)}</tbody></table>
-      <h2 style={{ marginTop: 32 }}>All orders</h2>
-      <table><tbody>{orders.map((o) => <tr key={o.id}><td>{o.user.email}</td><td>৳{o.total}</td><td>{o.method}</td><td>{o.status}</td></tr>)}</tbody></table>
+    <main className="wrap" style={{ paddingTop: 40, paddingBottom: 40 }}>
+      <h1 style={{ fontSize: "2.5rem", marginBottom: "20px" }}>Vendors</h1>
+      <div style={{ background: "#f9f9f9", padding: "20px", borderRadius: "10px", marginBottom: "40px" }}>
+        {vendors.map((v) => (
+          <div key={v.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #ddd" }}>
+            <span>{v.shopName}</span>
+            <span>{v.user.email}</span>
+          </div>
+        ))}
+      </div>
+
+      <h1 style={{ fontSize: "2.5rem", marginBottom: "20px" }}>All Orders</h1>
+      <div style={{ background: "#f9f9f9", padding: "20px", borderRadius: "10px" }}>
+        {orders.length === 0 ? (
+          <p>No orders yet.</p>
+        ) : (
+          orders.map((o) => (
+            <div key={o.id} style={{ borderBottom: "1px solid #ddd", padding: "15px 0" }}>
+              <p><strong>Order ID:</strong> {o.id}</p>
+              <p><strong>Customer:</strong> {o.user.name || o.user.email}</p>
+              <p><strong>Total:</strong> ৳{o.total} | <strong>Status:</strong> {o.status} | <strong>Method:</strong> {o.method}</p>
+              <p><strong>Items:</strong> {o.items.map((i: any) => `${i.qty}x ${i.product.title}`).join(", ")}</p>
+            </div>
+          ))
+        )}
+      </div>
     </main>
   );
 }
