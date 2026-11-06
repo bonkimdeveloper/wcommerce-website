@@ -1,77 +1,115 @@
-"use client";
-
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton"; // নিচে এই কম্পোনেন্টটি দেওয়া আছে
 
-export default function Dashboard() {
+export const dynamic = "force-dynamic";
+
+export default async function Dashboard() {
+  const session = await getSession();
+  const user = session?.user as any;
+
+  if (!user) {
+    redirect("/");
+  }
+
+  // ডাটাবেস থেকে ইউজারের আসল ডাটা এবং অর্ডার লিস্ট আনা
+  const dbUser = await db.user.findUnique({ where: { email: user.email! } });
+  const orders = await db.order.findMany({
+    where: { userId: dbUser?.id },
+    include: { items: { include: { product: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f8f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f3f6f1", fontFamily: "var(--fb, system-ui)" }}>
       
       {/* সাইডবার */}
-      <aside style={{ width: "240px", padding: "30px 20px", display: "flex", flexDirection: "column", gap: "40px" }}>
-        {/* লোগো */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "60px", height: "60px", background: "linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)", borderRadius: "8px", color: "white", fontWeight: "bold", fontSize: "14px", padding: "8px" }}>
-          viewe
+      <aside style={{ width: "260px", background: "#fff", padding: "30px 20px", borderRight: "1px solid #eaeaea", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "40px" }}>
+          <div style={{ width: "45px", height: "45px", borderRadius: "50%", background: "#ff9b54", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: "bold" }}>
+            {dbUser?.name?.charAt(0).toUpperCase() || "U"}
+          </div>
+          <div>
+            <h2 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 700 }}>{dbUser?.name || "User"}</h2>
+            <p style={{ fontSize: "0.8rem", color: "#666", margin: 0 }}>{dbUser?.email}</p>
+          </div>
         </div>
 
-        {/* মেনু */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "16px", marginTop: "20px" }}>
-          <Link href="#" style={{ color: "#111", fontWeight: "600", textDecoration: "none" }}>Orders</Link>
-          <Link href="#" style={{ color: "#888", textDecoration: "none" }}>Profile</Link>
+        <nav style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <Link href="/dashboard" style={{ padding: "12px 16px", background: "#f0fdf4", color: "#166534", borderRadius: "8px", textDecoration: "none", fontWeight: 600 }}>
+            📦 My Orders
+          </Link>
+          <Link href="/dashboard/profile" style={{ padding: "12px 16px", color: "#444", borderRadius: "8px", textDecoration: "none", fontWeight: 500 }}>
+            👤 Profile Settings
+          </Link>
+          {dbUser?.role === "ADMIN" && (
+            <Link href="/admin" style={{ padding: "12px 16px", color: "#444", borderRadius: "8px", textDecoration: "none", fontWeight: 500 }}>
+              🛡️ Admin Panel
+            </Link>
+          )}
+          <div style={{ marginTop: "auto", paddingTop: "40px" }}>
+            <LogoutButton />
+          </div>
         </nav>
       </aside>
 
       {/* মেইন কনটেন্ট */}
-      <main style={{ flex: 1, padding: "30px 40px" }}>
-        
-        {/* টপ বার (ইউজার আইকন) */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <main style={{ flex: 1, padding: "40px" }}>
+        <div style={{ maxWidth: "900px" }}>
+          <div style={{ background: "#fff", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", marginBottom: "30px" }}>
+            <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", fontFamily: "var(--fd, sans-serif)" }}>Welcome back, {dbUser?.name?.split(" ")[0]}! 👋</h1>
+            <p style={{ color: "#666", margin: 0 }}>Here you can track your recent orders and manage your account.</p>
           </div>
-        </div>
 
-        {/* ওয়েলকাম কার্ড */}
-        <div style={{ background: "white", borderRadius: "24px", padding: "40px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", position: "relative", overflow: "hidden", minHeight: "350px" }}>
+          <h2 style={{ fontSize: "1.4rem", marginBottom: "20px" }}>Recent Orders</h2>
           
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <h1 style={{ fontSize: "24px", fontWeight: "600", color: "#111", marginBottom: "4px" }}>Welcome</h1>
-              <p style={{ fontSize: "18px", color: "#777" }}>Ready to shop?</p>
+          {orders.length === 0 ? (
+            <div style={{ background: "#fff", padding: "40px", borderRadius: "16px", textAlign: "center", color: "#666" }}>
+              <p style={{ fontSize: "2rem", marginBottom: "10px" }}>🛍️</p>
+              <h3 style={{ margin: "0 0 10px" }}>No orders yet</h3>
+              <p style={{ marginBottom: "20px" }}>Looks like you haven't placed any orders yet.</p>
+              <Link href="/" style={{ background: "#4a1a00", color: "#fff", padding: "10px 20px", borderRadius: "99px", textDecoration: "none", fontWeight: 600 }}>Start Shopping</Link>
             </div>
-            <Link href="/" style={{ background: "#e83e74", color: "white", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", fontWeight: "500", fontSize: "14px" }}>
-              Shop now
-            </Link>
-          </div>
+          ) : (
+            <div style={{ display: "grid", gap: "20px" }}>
+              {orders.map((order) => (
+                <div key={order.id} style={{ background: "#fff", padding: "20px", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", gap: "15px" }}>
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "15px" }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Order #{order.id.slice(-6).toUpperCase()}</p>
+                      <p style={{ margin: "4px 0 0", color: "#666", fontSize: "0.85rem" }}>{new Date(order.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ 
+                        background: order.status === 'PAID' ? '#dcfce7' : order.status === 'PENDING' ? '#fef08a' : '#fee2e2', 
+                        color: order.status === 'PAID' ? '#166534' : order.status === 'PENDING' ? '#854d0e' : '#991b1b',
+                        padding: "6px 12px", borderRadius: "99px", fontSize: "0.8rem", fontWeight: 700 
+                      }}>
+                        {order.status}
+                      </span>
+                    </div>
+                  </div>
 
-          {/* প্রোডাক্ট ক্যারোসেল (ছবির মতো সাজানো) */}
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "70px", position: "relative", width: "100%" }}>
-            
-            {/* বাম দিকের ১ম */}
-            <div style={{ width: "110px", height: "150px", background: "#f8f9fa", borderRadius: "16px", transform: "rotate(-15deg) translateY(30px) translateX(30px)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", zIndex: 1 }}>
-              <img src="https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=150" alt="drink" style={{ width: "70%", transform: "rotate(5deg)" }} />
-            </div>
-            
-            {/* বাম দিকের ২য় */}
-            <div style={{ width: "130px", height: "170px", background: "#f8f9fa", borderRadius: "16px", transform: "rotate(-8deg) translateY(10px) translateX(15px)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", zIndex: 2 }}>
-              <img src="https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=150" alt="drink" style={{ width: "70%" }} />
-            </div>
+                  <div>
+                    {order.items.map((item: any) => (
+                      <div key={item.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "0.95rem" }}>
+                        <span>{item.qty} × {item.product.title}</span>
+                        <span style={{ fontWeight: 600 }}>৳{item.price * item.qty}</span>
+                      </div>
+                    ))}
+                  </div>
 
-            {/* মাঝখানের বড় */}
-            <div style={{ width: "150px", height: "190px", background: "#f8f9fa", borderRadius: "20px", zIndex: 3, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 15px 30px rgba(0,0,0,0.08)", transform: "translateY(-10px)" }}>
-              <img src="https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=150" alt="drink" style={{ width: "70%" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", paddingTop: "15px", fontWeight: 700, fontSize: "1.1rem" }}>
+                    <span>Total</span>
+                    <span>৳{order.total}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            {/* ডান দিকের ১ম */}
-            <div style={{ width: "130px", height: "170px", background: "#f8f9fa", borderRadius: "16px", transform: "rotate(8deg) translateY(10px) translateX(-15px)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", zIndex: 2 }}>
-              <img src="https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=150" alt="drink" style={{ width: "70%" }} />
-            </div>
-
-            {/* ডান দিকের ২য় */}
-            <div style={{ width: "110px", height: "150px", background: "#f8f9fa", borderRadius: "16px", transform: "rotate(15deg) translateY(30px) translateX(-30px)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px rgba(0,0,0,0.05)", zIndex: 1 }}>
-              <img src="https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=150" alt="drink" style={{ width: "70%", transform: "rotate(-5deg)" }} />
-            </div>
-
-          </div>
+          )}
         </div>
       </main>
     </div>
