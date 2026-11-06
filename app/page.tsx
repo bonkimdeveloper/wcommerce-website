@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react"; // <--- আসল লগইনের জন্য এটি যুক্ত করা হলো
 
-// এই লাইনটি যুক্ত করা হলো
 export const dynamic = "force-dynamic";
 
 export default function Home() {
@@ -326,8 +326,9 @@ export default function Home() {
       if($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
       $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if($("#amErr")) $("#amErr").textContent = ""; }); });
       
+      // ১. গুগল লগইন ফিক্স
       if($("#amG")) $("#amG").addEventListener("click", function () { 
-        router.push('/dashboard'); 
+        signIn("google", { callbackUrl: "/dashboard" }); 
       });
       
       var handleKeydownAcct = function (e: any) {
@@ -337,11 +338,14 @@ export default function Home() {
       };
       document.addEventListener("keydown", handleKeydownAcct);
       
+      // ২. ইমেইল লগইন ফিক্স
       if($("#amF")) $("#amF").addEventListener("submit", function (e: any) {
         e.preventDefault(); var v = $("#amE").value.trim(), err = $("#amErr");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { err.textContent = v ? "That email doesn’t look right. Try name@example.com." : "Enter your email to continue."; if (anim) G.fromTo(".fld", { x: -8 }, { x: 0, duration: 0.6, ease: "elastic.out(1,.3)" }); return; }
         err.textContent = "";
-        router.push('/dashboard');
+        
+        // ম্যাজিক লিংক পাঠানো
+        signIn("email", { email: v, callbackUrl: "/dashboard" });
       });
 
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
