@@ -64,13 +64,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid order total." }, { status: 400 });
     }
 
+    // Recheck stock and vendor approval immediately before creating the order.
     const order = await db.$transaction(async (tx) => {
       for (const item of orderItems) {
-        const stock = await tx.product.updateMany({
+        const product = await tx.product.findFirst({
           where: { id: item.productId, active: true, stock: { gte: item.qty }, vendor: { approved: true } },
-          data: { stock: { decrement: item.qty } },
+          select: { id: true },
         });
-        if (stock.count !== 1) throw new Error("INSUFFICIENT_STOCK");
+        if (!product) throw new Error("INSUFFICIENT_STOCK");
       }
       return tx.order.create({
         data: {
