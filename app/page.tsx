@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react"; // <--- আসল লগইনের জন্য এটি যুক্ত করা হলো
+import { signIn } from "next-auth/react"; 
 
 export const dynamic = "force-dynamic";
 
@@ -311,9 +311,9 @@ export default function Home() {
       var COPY: any = { customer: ["Sign in", "Sign in or create an account", "Email", "Email me with news and offers"], seller: ["Sell on Khabo", "Create a seller account and open your shop", "Business email", "Email me seller tips and updates"] };
       function amSet(m: any) { var c = COPY[m]; if(am) am.dataset.m = m; if($("#amT")) $("#amT").textContent = c[0]; if($("#amS")) $("#amS").textContent = c[1]; if($("#amE")) $("#amE").placeholder = c[2]; if($("#amE")) $("#amE").setAttribute("aria-label", c[2]); if($("#amCk")) $("#amCk").textContent = c[3]; $$("#amTabs button").forEach(function (b: any) { b.setAttribute("aria-selected", b.dataset.m === m); }); }
       function openAcct(m: any) {
-        amLast = document.activeElement; amSet(m || "customer"); if($("#amMain")) $("#amMain").hidden = false; if($("#amOk")) $("#amOk").hidden = true; if($("#amErr")) $("#amErr").textContent = ""; if($("#amE")) $("#amE").value = ""; if(am) am.hidden = false; root.classList.add("lock");
+        amLast = document.activeElement; amSet(m || "customer"); if($("#amMain")) $("#amMain").hidden = false; if($("#amOk")) $("#amOk").hidden = true; if($("#amErr")) $("#amErr").textContent = ""; if($("#amPhone")) $("#amPhone").value = ""; if($("#amPass")) $("#amPass").value = ""; if(am) am.hidden = false; root.classList.add("lock");
         if (anim) { G.fromTo("#amSc", { opacity: 0 }, { opacity: 1, duration: 0.4 }); G.fromTo(amBox, { y: 60, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, duration: 0.9, ease: "expo.out" }); G.from($$("#amMain>*"), { y: 18, opacity: 0, duration: 0.8, ease: "expo.out", stagger: 0.05, delay: 0.15 }); }
-        setTimeout(function () { if($("#amE")) $("#amE").focus({ preventScroll: true }); }, 60);
+        setTimeout(function () { if($("#amPhone")) $("#amPhone").focus({ preventScroll: true }); }, 60);
       }
       function closeAcct() {
         var done = function () { if(am) am.hidden = true; root.classList.remove("lock"); if (amLast) amLast.focus(); };
@@ -326,11 +326,6 @@ export default function Home() {
       if($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
       $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if($("#amErr")) $("#amErr").textContent = ""; }); });
       
-      // ১. গুগল লগইন ফিক্স
-      if($("#amG")) $("#amG").addEventListener("click", function () { 
-        signIn("google", { callbackUrl: "/dashboard" }); 
-      });
-      
       var handleKeydownAcct = function (e: any) {
         if(!am || am.hidden) return; if (e.key === "Escape") { closeAcct(); return; } if (e.key !== "Tab") return;
         var f = $$("button,input,a[href]", amBox).filter(function (x: any) { return x.offsetParent && !x.closest("[hidden]"); }); if (!f.length) return; var a = f[0], z = f[f.length - 1];
@@ -338,14 +333,31 @@ export default function Home() {
       };
       document.addEventListener("keydown", handleKeydownAcct);
       
-      // ২. ইমেইল লগইন ফিক্স
+      // ফোন এবং পাসওয়ার্ড লগইন ফাংশন
       if($("#amF")) $("#amF").addEventListener("submit", function (e: any) {
-        e.preventDefault(); var v = $("#amE").value.trim(), err = $("#amErr");
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { err.textContent = v ? "That email doesn’t look right. Try name@example.com." : "Enter your email to continue."; if (anim) G.fromTo(".fld", { x: -8 }, { x: 0, duration: 0.6, ease: "elastic.out(1,.3)" }); return; }
-        err.textContent = "";
+        e.preventDefault();
+        var phone = $("#amPhone").value.trim();
+        var pass = $("#amPass").value.trim();
+        var err = $("#amErr");
+        var selectedRole = am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
+
+        if (phone.length < 11) {
+          err.textContent = "Please enter a valid phone number (e.g. 01712345678).";
+          return;
+        }
+        if (pass.length < 4) {
+          err.textContent = "Password must be at least 4 characters.";
+          return;
+        }
+
+        err.textContent = "Please wait...";
         
-        // ম্যাজিক লিংক পাঠানো
-        signIn("email", { email: v, callbackUrl: "/dashboard" });
+        signIn("credentials", { 
+          phone: phone, 
+          password: pass,
+          role: selectedRole,
+          callbackUrl: "/dashboard" 
+        });
       });
 
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
@@ -605,11 +617,19 @@ export default function Home() {
           <div class="amb" id="amBox" role="dialog" aria-modal="true" aria-labelledby="amT">
             <button class="ibtn amx" id="amX" type="button" aria-label="Close">✕</button>
             <div id="amMain"><div class="tabs" id="amTabs" role="tablist"><button type="button" role="tab" data-m="customer" aria-selected="true">Customer</button><button type="button" role="tab" data-m="seller" aria-selected="false">Seller</button></div>
-              <h2 id="amT">Sign in</h2><p class="sub" id="amS">Sign in or create an account</p>
-              <button class="btn amg" type="button" id="amG">Continue with Google</button>
-              <div class="or">or</div>
-              <form id="amF" novalidate><div class="fld"><input id="amE" type="email" autocomplete="email" inputmode="email" placeholder="Email" aria-label="Email"><button type="submit" aria-label="Continue with email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button></div><p class="err" id="amErr" role="alert"></p>
-                <label class="ck"><input type="checkbox" checked><span id="amCk">Email me with news and offers</span></label></form>
+              <h2 id="amT">Sign in / Sign up</h2><p class="sub" id="amS">Enter your phone and password to continue</p>
+              
+              <form id="amF" novalidate style="display:flex; flex-direction:column; gap:12px;">
+                <div class="fld">
+                  <input id="amPhone" type="tel" inputmode="numeric" placeholder="Phone Number (e.g. 01712345678)" aria-label="Phone" style="width:100%; border:none; outline:none; background:transparent; font:inherit;">
+                </div>
+                <div class="fld">
+                  <input id="amPass" type="password" placeholder="Password" aria-label="Password" style="width:100%; border:none; outline:none; background:transparent; font:inherit;">
+                </div>
+                <p class="err" id="amErr" role="alert" style="margin:0;"></p>
+                <button class="btn" type="submit" style="width:100%; justify-content:center;">Continue</button>
+              </form>
+
               <p class="tos">By continuing, you agree to our <a href="#">Terms of service</a></p></div>
             <div class="ok" id="amOk" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path id="amTick" d="M7 12.5l3.5 3.5L17 9" /></svg><h2>Check your inbox</h2><p id="amOkP"></p></div>
           </div></div>
