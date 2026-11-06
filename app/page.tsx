@@ -375,7 +375,7 @@ export default function Home() {
         var password = $("#amPass").value;
         var err = $("#amErr");
         var wantsSeller = am?.dataset.m === "seller";
-        if (!/^((\\+?880)?0?1[3-9]\\d{8})$/.test(phone.replace(/[\\s()-]/g, ""))) {
+        if (!/^((\+?880)?0?1[3-9]\d{8})$/.test(phone.replace(/[\s()-]/g, ""))) {
           err.textContent = "Enter a valid Bangladesh mobile number.";
           return;
         }
