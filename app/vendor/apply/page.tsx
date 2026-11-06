@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getSession, requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,7 @@ export default async function Apply() {
   if (user.role !== "CUSTOMER") redirect("/");
   async function apply(fd: FormData) {
     "use server";
-    const current = await getSession();
-    const currentUser = current?.user as any;
-    if (!currentUser?.id) throw new Error("Unauthorized");
+    const currentUser = await requireRole("CUSTOMER");
     const shopName = String(fd.get("shop") || "").trim();
     const area = String(fd.get("area") || "").trim();
     if (shopName.length < 2 || shopName.length > 80 || area.length > 120) throw new Error("Please enter a valid shop name and area.");
