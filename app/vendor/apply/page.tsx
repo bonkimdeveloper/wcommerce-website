@@ -1,19 +1,31 @@
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { getSession, requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
-export default function Apply() {
+
+export const dynamic = "force-dynamic";
+
+export default async function Apply() {
+  const session = await getSession();
+  const user = session?.user as any;
+  if (!user?.id) redirect("/");
+  const existing = await db.vendor.findUnique({ where: { userId: user.id } });
+  if (user.role === "VENDOR" && existing?.approved) redirect("/vendor");
+  if (existing && !existing.approved) {
+    return <main className="wrap" style={{ maxWidth: 560, paddingTop: 40 }}><h2>Application under review</h2><p>Your shop application has been submitted. Your account remains a customer until an admin approves it.</p><p><strong>Shop:</strong> {existing.shopName}</p></main>;
+  }
+  if (user.role !== "CUSTOMER") redirect("/");
   async function apply(fd: FormData) {
     "use server";
-    const u = await requireRole("CUSTOMER", "VENDOR", "ADMIN");
-    await db.vendor.upsert({ where: { userId: u.id }, update: {}, create: { userId: u.id, shopName: String(fd.get("shop")), area: String(fd.get("area")) } });
-    if (u.role === "CUSTOMER") await db.user.update({ where: { id: u.id }, data: { role: "VENDOR" } });
+    const currentUser = await requireRole("CUSTOMER");
+    const shopName = String(fd.get("shop") || "").trim();
+    const area = String(fd.get("area") || "").trim();
+    if (shopName.length < 2 || shopName.length > 80 || area.length > 120) throw new Error("Please enter a valid shop name and area.");
+    await db.vendor.upsert({
+      where: { userId: currentUser.id },
+      update: {},
+      create: { userId: currentUser.id, shopName, area, approved: false },
+    });
     redirect("/vendor");
   }
-  return (
-    <main className="wrap" style={{ maxWidth: 480, paddingTop: 40 }}>
-      <h2>Open a shop</h2><p>An admin approves your shop before it goes live.</p>
-      <form action={apply}><label>Shop name</label><input name="shop" required /><label>Area</label><input name="area" required />
-        <p><button className="btn">Apply</button></p></form>
-    </main>
-  );
+  return <main className="wrap" style={{ maxWidth: 480, paddingTop: 40 }}><h2>Open a shop</h2><p>Submit your shop for admin review. Your account will remain a customer until approval.</p><form action={apply}><label>Shop name</label><input name="shop" required maxLength={80} /><label>Area</label><input name="area" required maxLength={120} /><p><button className="btn">Submit application</button></p></form></main>;
 }
