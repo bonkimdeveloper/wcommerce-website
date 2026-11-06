@@ -1,109 +1,136 @@
-import { PrismaClient } from '@prisma/client'
-const prisma = new PrismaClient()
-
-async function main() {
-  console.log('Seeding real data...')
-
-  // ১. অ্যাডমিন ইউজার তৈরি
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@gmail.com' },
-    update: { role: 'ADMIN' },
-    create: { email: 'admin@gmail.com', name: 'Admin Bhai', role: 'ADMIN' },
-  })
-
-  // ২. ভেন্ডর ইউজার তৈরি
-  const vendorUser = await prisma.user.upsert({
-    where: { email: 'vendor@gmail.com' },
-    update: { role: 'VENDOR' },
-    create: { email: 'vendor@gmail.com', name: 'Bhai Bhai Biryani', role: 'VENDOR' },
-  })
-
-  // ৩. ভেন্ডর প্রোফাইল তৈরি
-  const vendor = await prisma.vendor.upsert({
-    where: { userId: vendorUser.id },
-    update: {},
-    create: {
-      userId: vendorUser.id,
-      shopName: 'Bhai Bhai Biryani',
-      area: 'Dhanmondi',
-      approved: true,
-    },
-  })
-
-  // ৪. ক্যাটাগরি তৈরি
-  const category = await prisma.category.upsert({
-    where: { slug: 'rice-curry' },
-    update: {},
-    create: { name: 'Rice & Curry', slug: 'rice-curry' },
-  })
-
-  // ৫. প্রোডাক্ট তৈরি
-  const product = await prisma.product.create({
-    data: {
-      vendorId: vendor.id,
-      categoryId: category.id,
-      title: 'Chicken Biryani',
-      description: 'Slow-cooked rice and spice',
-      price: 220,
-      stock: 50,
-    },
-  })
-
-  // ৬. কাস্টমার ইউজার তৈরি
-  const customer = await prisma.user.upsert({
-    where: { email: 'customer@gmail.com' },
-    update: {},
-    create: { email: 'customer@gmail.com', name: 'Rakib Hasan', role: 'CUSTOMER' },
-  })
-
-  // ৭. একটি ডেমো অর্ডার তৈরি (যাতে অ্যাডমিন প্যানেলে দেখা যায়)
-  await prisma.order.create({
-    data: {
-      userId: customer.id,
-      total: 220,
-      status: 'PAID',
-      method: 'BKASH',
-      address: { line: 'House 123, Road 4', phone: '01712345678' },
-      items: {
-        create: [
-          {
-            productId: product.id,
-            vendorId: vendor.id,
-            qty: 1,
-            price: 220,
-          },
-        ],
-      },
-    },
-  })
-
-  console.log('Data seeded successfully!')
-    // ৭. একটি ডেমো অর্ডার তৈরি
-  const customer = await prisma.user.findUnique({ where: { email: 'customer@gmail.com' } });
-  const product = await prisma.product.findFirst();
-
-  if (customer && product) {
-    await prisma.order.create({
-      data: {
-        userId: customer.id,
-        total: product.price,
-        status: 'PAID',
-        method: 'BKASH',
-        address: { line: 'House 123, Dhanmondi', phone: '01700000000' },
-        items: {
-          create: [{ productId: product.id, vendorId: product.vendorId, qty: 1, price: product.price }]
-        }
-      }
-    });
-    console.log('Demo order created!');
-  }
+generator client {
+  provider = "prisma-client-js"
 }
 
-main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  SSLCOMMERZ
+  COD
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(CUSTOMER)
+  accounts      Account[]
+  sessions      Session[]
+  vendor        Vendor?
+  orders        Order[]
+  createdAt     DateTime  @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Vendor {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  shopName   String
+  area       String    @default("")
+  approved   Boolean   @default(false)
+  commission Float     @default(10)
+  user       User      @relation(fields: [userId], references: [id])
+  products   Product[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  vendorId    String
+  categoryId  String
+  title       String
+  description String      @default("")
+  price       Int
+  stock       Int         @default(100)
+  active      Boolean     @default(true)
+  vendor      Vendor      @relation(fields: [vendorId], references: [id])
+  category    Category    @relation(fields: [categoryId], references: [id])
+  items       OrderItem[]
+}
+
+model Order {
+  id        String        @id @default(cuid())
+  userId    String
+  total     Int
+  status    OrderStatus   @default(PENDING)
+  method    PaymentMethod
+  tranId    String?       @unique
+  address   Json
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  vendorId  String
+  qty       Int
+  price     Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+}
