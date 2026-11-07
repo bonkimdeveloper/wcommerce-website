@@ -2,23 +2,27 @@
 
 import { useEffect, useRef } from "react";
 import Script from "next/script";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react"; 
-
-export const dynamic = "force-dynamic";
+import { signIn, getSession } from "next-auth/react";
 
 export default function Home() {
   const initialized = useRef(false);
-  const router = useRouter();
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
-    let checkGSAP: NodeJS.Timeout;
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    let checkGSAP: ReturnType<typeof setTimeout> | undefined;
 
     const initAnimation = () => {
-      if (typeof window === "undefined" || !(window as any).gsap || !(window as any).ScrollTrigger) {
+      if (disposed) return;
+
+      if (
+        typeof window === "undefined" ||
+        !(window as any).gsap ||
+        !(window as any).ScrollTrigger
+      ) {
         checkGSAP = setTimeout(initAnimation, 100);
         return;
       }
@@ -29,10 +33,10 @@ export default function Home() {
 
       var RM = window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         anim = !RM;
-      
+
       var $ = function (s: any, r?: any) {
-          return (r || document).querySelector(s);
-        },
+        return (r || document).querySelector(s);
+      },
         $$ = function (s: any, r?: any) {
           return Array.prototype.slice.call((r || document).querySelectorAll(s));
         };
@@ -44,12 +48,12 @@ export default function Home() {
         { n: "mishti & sweets", e: "🍮", bg: "#ff7ca4", deep: "#47082a", tint: "#ffa6c2", label: "#fff1f6", f: ["🍯", "🥛", "🍓"], note: "Rasgulla, doi and pitha from the shops your family already trusts.", k: "Sweets", p: "from ৳60" },
         { n: "fresh & organic", e: "🥗", bg: "#cbe765", deep: "#223200", tint: "#ddf294", label: "#fbffea", f: ["🥕", "🍅", "🥬"], note: "Vegetables, fruit and eggs picked this morning by farms near you.", k: "Farm fresh", p: "from ৳30" },
         { n: "juice & drinks", e: "🥤", bg: "#a5d2f6", deep: "#0d2d4f", tint: "#c9e5fb", label: "#f2f9ff", f: ["🍊", "🧊", "🥭"], note: "Cold-pressed juice, lassi and cha made to order.", k: "Drinks", p: "from ৳50" },
-        { n: "fresh bakery", e: "🥐", bg: "#ffbf94", deep: "#4a1606", tint: "#ffd8bd", label: "#fff6ef", f: ["🌾", "🧈", "🍞"], note: "Bread, buns and cakes out of the oven within the hour.", k: "Bakery", p: "from ৳70" },
+        { n: "fresh bakery", e: "🥖", bg: "#f5deb3", deep: "#3d2a00", tint: "#ffe9b8", label: "#fffaf0", f: ["🥐", "🍞", "🥖"], note: "Bread, buns and cakes out of the oven within the hour.", k: "Bakery", p: "from ৳70" },
       ];
       var N = D.length;
 
       function words(el: any) { el.innerHTML = el.textContent.split(" ").map(function (w: any) { return '<span class="w"><span class="wi">' + w + "</span></span>"; }).join(" "); return $$(".wi", el); }
-      
+
       function vars(el: any, o: any, d?: any) { if (anim && d !== 0) G.to(el, Object.assign({ duration: d || 0.9, ease: "power2.inOut", overwrite: "auto" }, o)); else Object.keys(o).forEach(function (k) { el.style.setProperty(k, o[k]); }); }
 
       var hdr = $("#hdr");
@@ -58,45 +62,45 @@ export default function Home() {
 
       var bag: any[] = [], FREE = 500, cart = $("#cart"), cartLast: any = null;
       try { bag = (JSON.parse(localStorage.getItem("khabo-bag") || "[]") || []).filter(function (i: any) { return i && i.id && i.q > 0 && typeof i.p === "number"; }); } catch (e) { bag = []; }
-      
+
       function money(n: any) { return "৳" + n.toLocaleString("en-US"); }
       function itemFrom(b: any) { if (b.id === "hAdd") { var d = D[cur]; return { id: d.n, name: d.n.charAt(0).toUpperCase() + d.n.slice(1), e: d.e, v: d.k, p: parseInt(d.p.replace(/\D/g, ""), 10) }; } return { id: b.dataset.n, name: b.dataset.n, e: b.dataset.e, v: b.dataset.v, p: +b.dataset.p }; }
       function addItem(it: any) { var f = bag.filter(function (x: any) { return x.id === it.id; })[0]; if (f) f.q++; else { it.q = 1; bag.push(it); } renderBag(); }
-      
+
       function renderBag() {
         var n = bag.reduce(function (a: any, i: any) { return a + i.q; }, 0), s = bag.reduce(function (a: any, i: any) { return a + i.p * i.q; }, 0);
-        if($("#bagN")) { $("#bagN").textContent = n; $("#bagN").dataset.n = n; $("#bag").setAttribute("aria-label", "Open bag, " + n + (n === 1 ? " item" : " items")); }
-        if($("#cList")) $("#cList").innerHTML = bag.map(function (i: any, k: any) { return '<li class="ci"><div class="cia">' + i.e + '</div><div><h3>' + i.name + '</h3><p class="cv">' + i.v + '</p><div class="qty"><button data-dec="' + k + '" aria-label="Decrease quantity of ' + i.name + '">−</button><span aria-live="polite">' + i.q + '</span><button data-inc="' + k + '" aria-label="Increase quantity of ' + i.name + '">+</button></div></div><div class="cir"><span class="cp2">' + money(i.p * i.q) + '</span><button class="rm" data-rm="' + k + '">Remove</button></div></li>'; }).join("");
-        if($("#cEmpty")) $("#cEmpty").hidden = n > 0; 
-        if($("#cFoot")) $("#cFoot").hidden = n === 0; 
-        if($("#cList")) $("#cList").hidden = n === 0; 
-        if($("#cSub")) $("#cSub").textContent = money(s);
+        if ($("#bagN")) { $("#bagN").textContent = n; $("#bagN").dataset.n = n; $("#bag").setAttribute("aria-label", "Open bag, " + n + (n === 1 ? " item" : " items")); }
+        if ($("#cList")) $("#cList").innerHTML = bag.map(function (i: any, k: any) { return '<li class="ci"><div class="cia">' + i.e + '</div><div><h3>' + i.name + '</h3><p class="cv">' + i.v + '</p><div class="qty"><button data-dec="' + k + '" aria-label="Decrease quantity of ' + i.name + '">−</button><span aria-live="polite">' + i.q + '</span><button data-inc="' + k + '" aria-label="Increase quantity of ' + i.name + '">+</button></div></div><div class="cir"><span class="cp2">' + money(i.p * i.q) + '</span><button class="rm" data-rm="' + k + '">Remove</button></div></li>'; }).join("");
+        if ($("#cEmpty")) $("#cEmpty").hidden = n > 0;
+        if ($("#cFoot")) $("#cFoot").hidden = n === 0;
+        if ($("#cList")) $("#cList").hidden = n === 0;
+        if ($("#cSub")) $("#cSub").textContent = money(s);
         var left = Math.max(0, FREE - s);
-        if($("#cMsg")) $("#cMsg").textContent = n === 0 ? "Add " + money(FREE) + " and delivery is free." : left ? "Add " + money(left) + " more and delivery is free." : "Nice. This order gets free delivery.";
-        var pct = Math.min(1, s / FREE); if (anim) G.to("#cBar", { scaleX: pct, duration: 0.8, ease: "expo.out", overwrite: true }); else if($("#cBar")) $("#cBar").style.transform = "scaleX(" + pct + ")";
-        try { localStorage.setItem("khabo-bag", JSON.stringify(bag)); } catch (e) {}
+        if ($("#cMsg")) $("#cMsg").textContent = n === 0 ? "Add " + money(FREE) + " and delivery is free." : left ? "Add " + money(left) + " more and delivery is free." : "Nice. This order gets free delivery.";
+        var pct = Math.min(1, s / FREE); if (anim) G.to("#cBar", { scaleX: pct, duration: 0.8, ease: "expo.out", overwrite: true }); else if ($("#cBar")) $("#cBar").style.transform = "scaleX(" + pct + ")";
+        try { localStorage.setItem("khabo-bag", JSON.stringify(bag)); } catch (e) { }
       }
 
       function openCart() {
-        cartLast = document.activeElement; if(cart) cart.hidden = false; root.classList.add("lock");
+        cartLast = document.activeElement; if (cart) cart.hidden = false; root.classList.add("lock");
         if (anim) { G.fromTo("#cSc", { opacity: 0 }, { opacity: 1, duration: 0.4 }); G.fromTo("#cPanel", { xPercent: 100 }, { xPercent: 0, duration: 0.7, ease: "expo.out" }); G.from($$(".ci"), { x: 40, opacity: 0, duration: 0.7, ease: "expo.out", stagger: 0.06, delay: 0.15 }); }
-        setTimeout(function () { if($("#cX")) $("#cX").focus({ preventScroll: true }); }, 60);
+        setTimeout(function () { if ($("#cX")) $("#cX").focus({ preventScroll: true }); }, 60);
       }
       function closeCart() {
-        var done = function () { if(cart) cart.hidden = true; root.classList.remove("lock"); if (cartLast) cartLast.focus(); };
+        var done = function () { if (cart) cart.hidden = true; root.classList.remove("lock"); if (cartLast) cartLast.focus(); };
         if (anim) { G.to("#cPanel", { xPercent: 100, duration: 0.5, ease: "expo.in" }); G.to("#cSc", { opacity: 0, duration: 0.4, onComplete: done }); } else done();
       }
 
-      if($("#bag")) $("#bag").addEventListener("click", openCart); 
-      if($("#cX")) $("#cX").addEventListener("click", closeCart); 
-      if($("#cSc")) $("#cSc").addEventListener("click", closeCart);
-      if($("#cBrowse")) $("#cBrowse").addEventListener("click", function () { closeCart(); setTimeout(function () { if($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); }, anim ? 450 : 0); });
-      
-      if($("#cGo")) $("#cGo").addEventListener("click", function () { 
+      if ($("#bag")) $("#bag").addEventListener("click", openCart);
+      if ($("#cX")) $("#cX").addEventListener("click", closeCart);
+      if ($("#cSc")) $("#cSc").addEventListener("click", closeCart);
+      if ($("#cBrowse")) $("#cBrowse").addEventListener("click", function () { closeCart(); setTimeout(function () { if ($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); }, anim ? 450 : 0); });
+
+      if ($("#cGo")) $("#cGo").addEventListener("click", function () {
         var s = bag.reduce(function (a: any, i: any) { return a + i.p * i.q; }, 0);
-        if($("#coTotal")) $("#coTotal").textContent = money(s);
-        if($("#cart")) $("#cart").hidden = true;
-        if($("#checkoutModal")) {
+        if ($("#coTotal")) $("#coTotal").textContent = money(s);
+        if ($("#cart")) $("#cart").hidden = true;
+        if ($("#checkoutModal")) {
           $("#checkoutModal").hidden = false;
           if (anim) {
             G.fromTo("#checkoutModal", { opacity: 0 }, { opacity: 1, duration: 0.4 });
@@ -105,45 +109,110 @@ export default function Home() {
         }
       });
 
-      if($("#coClose")) $("#coClose").addEventListener("click", function () {
+      if ($("#coClose")) $("#coClose").addEventListener("click", function () {
         if (anim) {
           G.to("#coBox", { y: 20, opacity: 0, duration: 0.3 });
-          G.to("#checkoutModal", { opacity: 0, duration: 0.3, onComplete: function() { 
-            $("#checkoutModal").hidden = true; 
-            root.classList.remove("lock");
-          } });
+          G.to("#checkoutModal", {
+            opacity: 0, duration: 0.3, onComplete: function () {
+              $("#checkoutModal").hidden = true;
+              root.classList.remove("lock");
+            }
+          });
         } else {
           $("#checkoutModal").hidden = true;
           root.classList.remove("lock");
         }
       });
 
-      $$(".pay-btn").forEach(function(btn: any) {
-        btn.addEventListener("click", function() {
-          $$(".pay-btn").forEach(function(b: any) { b.classList.remove("active"); });
+      $$(".pay-btn").forEach(function (btn: any) {
+        btn.addEventListener("click", function () {
+          $$(".pay-btn").forEach(function (b: any) { b.classList.remove("active"); });
           btn.classList.add("active");
+          var m = btn.dataset.method;
+          if (m === "COD") {
+            if ($("#coMobileBox")) $("#coMobileBox").style.display = "none";
+            if ($("#coCODBox")) $("#coCODBox").style.display = "block";
+          } else {
+            if ($("#coMobileBox")) $("#coMobileBox").style.display = "block";
+            if ($("#coCODBox")) $("#coCODBox").style.display = "none";
+          }
         });
       });
 
-      if($("#payConfirm")) $("#payConfirm").addEventListener("click", function () {
-        if($("#coMainBox")) $("#coMainBox").hidden = true;
-        if($("#coSuccessBox")) $("#coSuccessBox").hidden = false;
-        if (anim) {
-          G.fromTo("#coSuccessBox", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(1.5)" });
+      if ($("#payConfirm")) $("#payConfirm").addEventListener("click", async function () {
+        var err = $("#coErr");
+        if (err) err.textContent = "";
+
+        var fullName = $("#coName")?.value.trim();
+        var phone = $("#coPhone")?.value.trim();
+        var area = $("#coArea")?.value.trim();
+        var addressText = $("#coAddr")?.value.trim();
+        var activeBtn = $(".pay-btn.active");
+        var method = activeBtn ? activeBtn.dataset.method : "BKASH";
+        var senderNumber = $("#coSender")?.value.trim();
+        var trxId = $("#coTrx")?.value.trim();
+
+        if (!fullName || !phone || !area || !addressText) {
+          if (err) err.textContent = "সব address field পূরণ করুন।";
+          return;
         }
-        bag = [];
-        renderBag();
+
+        if (method !== "COD" && (!senderNumber || !trxId)) {
+          if (err) err.textContent = "Sender number এবং TrxID দিন।";
+          return;
+        }
+
+        var payload = {
+          items: bag.map(function (i: any) { return { title: i.id, qty: i.q }; }),
+          address: { fullName: fullName, phone: phone, area: area, address: addressText },
+          method: method,
+          senderNumber: senderNumber,
+          trxId: trxId,
+        };
+
+        var btn = $("#payConfirm");
+        if (btn) { btn.disabled = true; btn.textContent = "Placing order..."; }
+        if (err) err.textContent = "Please wait...";
+
+        try {
+          var res = await fetch("/api/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          var data = await res.json();
+
+          if (!res.ok || !data.success) {
+            if (err) err.textContent = data.error || "Order fail হয়েছে";
+            return;
+          }
+
+          if ($("#coMainBox")) $("#coMainBox").hidden = true;
+          if ($("#coSuccessBox")) $("#coSuccessBox").hidden = false;
+          if ($("#coOrderNum")) $("#coOrderNum").textContent = "Order #" + data.orderNumber;
+          if ($("#coSuccessMsg")) $("#coSuccessMsg").textContent = data.message || "Order placed!";
+
+          bag = [];
+          renderBag();
+        } catch (e) {
+          if (err) err.textContent = "Network error. Retry করুন।";
+          console.error("Checkout fetch error:", e);
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = "Place Order"; }
+        }
       });
 
-      if($("#coSuccessClose")) $("#coSuccessClose").addEventListener("click", function () {
+      if ($("#coSuccessClose")) $("#coSuccessClose").addEventListener("click", function () {
         if (anim) {
           G.to("#coBox", { y: 20, opacity: 0, duration: 0.3 });
-          G.to("#checkoutModal", { opacity: 0, duration: 0.3, onComplete: function() { 
-            $("#checkoutModal").hidden = true; 
-            $("#coMainBox").hidden = false;
-            $("#coSuccessBox").hidden = true;
-            root.classList.remove("lock");
-          } });
+          G.to("#checkoutModal", {
+            opacity: 0, duration: 0.3, onComplete: function () {
+              $("#checkoutModal").hidden = true;
+              $("#coMainBox").hidden = false;
+              $("#coSuccessBox").hidden = true;
+              root.classList.remove("lock");
+            }
+          });
         } else {
           $("#checkoutModal").hidden = true;
           $("#coMainBox").hidden = false;
@@ -151,19 +220,19 @@ export default function Home() {
           root.classList.remove("lock");
         }
       });
-      
-      if($("#cList")) $("#cList").addEventListener("click", function (e: any) {
+
+      if ($("#cList")) $("#cList").addEventListener("click", function (e: any) {
         var b = e.target.closest("button"); if (!b) return;
         if (b.dataset.inc != null) bag[+b.dataset.inc].q++; else if (b.dataset.dec != null) { var k = +b.dataset.dec; if (--bag[k].q <= 0) bag.splice(k, 1); } else if (b.dataset.rm != null) bag.splice(+b.dataset.rm, 1); else return; renderBag();
       });
 
       var handleKeydownCart = function (e: any) {
-        if(!cart || cart.hidden) return; if (e.key === "Escape") { closeCart(); return; } if (e.key !== "Tab") return;
+        if (!cart || cart.hidden) return; if (e.key === "Escape") { closeCart(); return; } if (e.key !== "Tab") return;
         var f = $$("button", $("#cPanel")).filter(function (x: any) { return x.offsetParent && !x.closest("[hidden]"); }); if (!f.length) return; var a = f[0], z = f[f.length - 1];
         if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
       };
       document.addEventListener("keydown", handleKeydownCart);
-      
+
       renderBag();
 
       var handleDocumentClick = function (e: any) {
@@ -178,19 +247,19 @@ export default function Home() {
       document.addEventListener("click", handleDocumentClick);
 
       var cur = 0, stage = $("#stage"), hName = $("#hName");
-      if(stage) stage.innerHTML = D.map(function (d, i) { return '<div class="hb" data-i="' + i + '"><div class="disc"><span>' + d.e + "</span></div></div>"; }).join("");
+      if (stage) stage.innerHTML = D.map(function (d, i) { return '<div class="hb" data-i="' + i + '"><div class="disc"><span>' + d.e + "</span></div></div>"; }).join("");
       var hbs = $$(".hb"), prev = hbs.map(function (_, i) { return rel(i); });
-      
+
       function rel(i: any) { var d = i - cur; if (d > N / 2) d -= N; if (d < -N / 2) d += N; return d; }
       function lp(d: any) {
-        if(!stage) return {};
+        if (!stage) return {};
         var w = stage.clientWidth, h = stage.clientHeight, mob = w < 760, a = Math.abs(d), s = d < 0 ? -1 : 1, k = Math.min(a, 3);
         var X = mob ? [0, 0.42, 0.8, 1] : [0, 0.22, 0.4, 0.55], S = mob ? [1, 0.58, 0.45, 0.36] : [1, 0.6, 0.48, 0.4], Y = mob ? [0, -0.08, -0.14, -0.16] : [0, -0.1, -0.2, -0.26], R = mob ? [0, 13, 16, 18] : [2, 12, 16, 18];
         return { x: w / 2 + s * X[k] * w, y: h / 2 + Y[k] * h, rotation: d ? s * R[k] : R[0], scale: S[k], opacity: a <= (mob ? 1 : 2) ? 1 : 0, zIndex: 10 - a };
       }
       function place(go: any) {
         hbs.forEach(function (el: any, i: any) {
-          var d = rel(i), p = lp(d), wr = Math.abs(d - prev[i]) > N / 2 - 0.5; prev[i] = d;
+          var d = rel(i), p: any = lp(d), wr = Math.abs(d - prev[i]) > N / 2 - 0.5; prev[i] = d;
           var o = Object.assign({ xPercent: -50, yPercent: -50 }, p);
           if (!go || !anim || wr) { if (wr && go && anim) { G.set(el, Object.assign({}, o, { opacity: 0 })); G.to(el, { opacity: p.opacity, duration: 0.6, delay: 0.3 }); } else G.set(el, o); }
           else G.to(el, Object.assign({ duration: 1.15, ease: "expo.out", overwrite: "auto" }, o));
@@ -205,9 +274,9 @@ export default function Home() {
         var t = ++tok, old = $$(".hc", hName); G.killTweensOf(old);
         G.to(old, { yPercent: -110 * dir, duration: 0.3, ease: "power3.in", stagger: 0.01, onComplete: function () { if (t !== tok) return; hName.innerHTML = nameHTML(D[cur].n); G.from($$(".hc", hName), { yPercent: 110 * dir, duration: 0.85, ease: "expo.out", stagger: 0.018 }); } });
       }
-      function meta(a: any) { if($("#hMeta")) $("#hMeta").textContent = String(cur + 1).padStart(2, "0") + " / 0" + N + " · " + D[cur].p; if (a && anim) G.fromTo("#hMeta", { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out", overwrite: true }); }
+      function meta(a: any) { if ($("#hMeta")) $("#hMeta").textContent = String(cur + 1).padStart(2, "0") + " / 0" + N + " · " + D[cur].p; if (a && anim) G.fromTo("#hMeta", { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out", overwrite: true }); }
       function colours(d: any) { var c = D[cur]; vars(root, { "--bg": c.bg, "--deep": c.deep, "--tint": c.tint, "--label": c.label }, d); }
-      
+
       var autoT: any; function arm() { clearTimeout(autoT); if (anim) autoT = setTimeout(function () { if (inView && !document.hidden) go(cur + 1); else arm(); }, 10000); }
       var inView = true;
       function go(i: any) {
@@ -215,19 +284,19 @@ export default function Home() {
         if (anim && hbs[cur]) G.fromTo(hbs[cur].firstChild as HTMLElement, { rotation: dir * 6, scaleX: 0.85 }, { rotation: 0, scaleX: 1, duration: 1.4, ease: "elastic.out(1,.55)" });
         swapName(dir); colours(0.9); meta(true); if (anim) G.fromTo("#hAdd", { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "back.out(2)", delay: 0.35, overwrite: true }); arm();
       }
-      
-      if($("#pv")) $("#pv").onclick = function () { go(cur - 1); }; 
-      if($("#nx")) $("#nx").onclick = function () { go(cur + 1); };
-      
-      var sx: any = null, st: any = null; 
-      if(stage) stage.addEventListener("pointerdown", function (e: any) { sx = e.clientX; st = e.target.closest(".hb"); });
-      
+
+      if ($("#pv")) $("#pv").onclick = function () { go(cur - 1); };
+      if ($("#nx")) $("#nx").onclick = function () { go(cur + 1); };
+
+      var sx: any = null, st: any = null;
+      if (stage) stage.addEventListener("pointerdown", function (e: any) { sx = e.clientX; st = e.target.closest(".hb"); });
+
       var handlePointerUp = function (e: any) { if (sx === null) return; var dx = e.clientX - sx; if (Math.abs(dx) > 45) go(cur + (dx < 0 ? 1 : -1)); else if (Math.abs(dx) < 8 && st && +st.dataset.i !== cur) go(+st.dataset.i); sx = null; };
       window.addEventListener("pointerup", handlePointerUp);
-      
-      colours(0); if(hName) hName.innerHTML = nameHTML(D[0].n); meta(false); place(false);
+
+      colours(0); if (hName) hName.innerHTML = nameHTML(D[0].n); meta(false); place(false);
       if (anim) { $$(".disc").forEach(function (el: any, k: any) { G.to(el, { y: -10, duration: 2.4 + (k % 3) * 0.3, ease: "sine.inOut", yoyo: true, repeat: -1, delay: k * 0.2 }); }); }
-      
+
       var handleResize = function () { place(false); };
       window.addEventListener("resize", handleResize);
 
@@ -237,20 +306,20 @@ export default function Home() {
       { n: 100, u: "%", l: "verified sellers", b: "Every vendor passes a check, and only customers who ordered can leave a review.", c: 3 }];
       var whyEl = $("#why"), wi = -1, nobj = { v: 0 };
       S.forEach(function (s, i) {
-        var d = document.createElement("div"); d.innerHTML = "<span>" + D[s.c].e + "</span>"; if($("#wV")) $("#wV").appendChild(d);
-        var b = document.createElement("button"); b.setAttribute("role", "tab"); b.setAttribute("aria-label", s.n + s.u + " " + s.l); b.onclick = function () { jump(whyEl, i, S.length); }; if($("#wS")) $("#wS").appendChild(b);
+        var d = document.createElement("div"); d.innerHTML = "<span>" + D[s.c].e + "</span>"; if ($("#wV")) $("#wV").appendChild(d);
+        var b = document.createElement("button"); b.setAttribute("role", "tab"); b.setAttribute("aria-label", s.n + s.u + " " + s.l); b.onclick = function () { jump(whyEl, i, S.length); }; if ($("#wS")) $("#wS").appendChild(b);
       });
       var wvs = $$("#wV>div");
-      function jump(el: any, i: any, n: any) { if(!el) return; window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + (i + 0.5) / n * (el.offsetHeight - window.innerHeight), behavior: anim ? "smooth" : "auto" }); }
+      function jump(el: any, i: any, n: any) { if (!el) return; window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + (i + 0.5) / n * (el.offsetHeight - window.innerHeight), behavior: anim ? "smooth" : "auto" }); }
       function whySet(i: any, dir: any) {
         var s = S[i], p = wi; wi = i; var c = D[s.c];
-        if($("#wI")) $("#wI").textContent = "0" + (i + 1); $$("#wS button").forEach(function (b: any, k: any) { b.setAttribute("aria-selected", k === i); });
-        vars(whyEl, { "--wb": c.bg, "--wd": c.deep }, p < 0 ? 0 : 0.8); if(whyEl) whyEl.style.setProperty("--wt", c.tint);
+        if ($("#wI")) $("#wI").textContent = "0" + (i + 1); $$("#wS button").forEach(function (b: any, k: any) { b.setAttribute("aria-selected", k === i); });
+        vars(whyEl, { "--wb": c.bg, "--wd": c.deep }, p < 0 ? 0 : 0.8); if (whyEl) whyEl.style.setProperty("--wt", c.tint);
         var num = $("#wNum"), u = $("#wU"), l = $("#wL"), b = $("#wB");
-        if (!anim || p < 0) { if(num) num.textContent = s.n; if(u) u.textContent = s.u; if(l) l.textContent = s.l; if(b) b.textContent = s.b; wvs.forEach(function (e: any, k: any) { e.classList.toggle("on", k === i); }); return; }
-        G.to(nobj, { v: s.n, duration: 1, ease: "power3.out", overwrite: true, onUpdate: function () { if(num) num.textContent = Math.round(nobj.v); } });
+        if (!anim || p < 0) { if (num) num.textContent = s.n; if (u) u.textContent = s.u; if (l) l.textContent = s.l; if (b) b.textContent = s.b; wvs.forEach(function (e: any, k: any) { e.classList.toggle("on", k === i); }); return; }
+        G.to(nobj, { v: s.n, duration: 1, ease: "power3.out", overwrite: true, onUpdate: function () { if (num) num.textContent = Math.round(nobj.v); } });
         G.fromTo(num, { yPercent: dir * 18 }, { yPercent: 0, duration: 1, ease: "expo.out", overwrite: "auto" });
-        G.to([u, l, b], { y: -dir * 22, opacity: 0, duration: 0.25, ease: "power2.in", stagger: 0.03, overwrite: true, onComplete: function () { if(u) u.textContent = S[wi].u; if(l) l.textContent = S[wi].l; if(b) b.textContent = S[wi].b; G.fromTo([u, l, b], { y: dir * 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out", stagger: 0.05 }); } });
+        G.to([u, l, b], { y: -dir * 22, opacity: 0, duration: 0.25, ease: "power2.in", stagger: 0.03, overwrite: true, onComplete: function () { if (u) u.textContent = S[wi].u; if (l) l.textContent = S[wi].l; if (b) b.textContent = S[wi].b; G.fromTo([u, l, b], { y: dir * 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out", stagger: 0.05 }); } });
         wvs.forEach(function (e: any, k: any) {
           if (k === i) { e.classList.add("on"); G.fromTo(e, { opacity: 0, scale: 0.9, rotation: dir * 8, y: dir * 40 }, { opacity: 1, scale: 1, rotation: 0, y: 0, duration: 1, ease: "expo.out", overwrite: true }); }
           else if (k === p) { G.to(e, { opacity: 0, scale: 0.9, rotation: -dir * 8, y: -dir * 40, duration: 0.45, ease: "power2.in", overwrite: true, onComplete: function () { e.classList.remove("on"); } }); } else { G.set(e, { opacity: 0 }); e.classList.remove("on"); }
@@ -261,18 +330,18 @@ export default function Home() {
 
       var flvEl = $("#cats"), fi = -1;
       D.forEach(function (d, i) {
-        var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>"; 
-        if(li.firstChild) (li.firstChild as HTMLElement).onclick = function () { jump(flvEl, i, N); }; 
-        if($("#fl")) $("#fl").appendChild(li);
-        var e = document.createElement("div"); e.className = "fe"; e.textContent = d.e; if($("#fe")) $("#fe").appendChild(e);
+        var li = document.createElement("li"); li.innerHTML = '<button aria-current="false"><span class="n">0' + (i + 1) + "</span><span>" + d.n + "</span></button>";
+        if (li.firstChild) (li.firstChild as HTMLElement).onclick = function () { jump(flvEl, i, N); };
+        if ($("#fl")) $("#fl").appendChild(li);
+        var e = document.createElement("div"); e.className = "fe"; e.textContent = d.e; if ($("#fe")) $("#fe").appendChild(e);
       });
       var fes = $$(".fe"), ffs = [$("#f1"), $("#f2"), $("#f3")];
-      function fill(d: any, i: any) { if($("#fN")) $("#fN").textContent = d.n; if($("#fNo")) $("#fNo").textContent = d.note; if($("#fEy")) $("#fEy").textContent = "Category 0" + (i + 1) + " of 0" + N + " · " + d.k; if($("#fP")) $("#fP").textContent = d.p; }
+      function fill(d: any, i: any) { if ($("#fN")) $("#fN").textContent = d.n; if ($("#fNo")) $("#fNo").textContent = d.note; if ($("#fEy")) $("#fEy").textContent = "Category 0" + (i + 1) + " of 0" + N + " · " + d.k; if ($("#fP")) $("#fP").textContent = d.p; }
       function flvSet(i: any, dir: any) {
         var d = D[i], p = fi; fi = i;
         vars(flvEl, { "--fb2": d.bg, "--fd2": d.deep, "--ft": d.tint }, p < 0 ? 0 : 0.8);
         $$("#fl button").forEach(function (b: any, k: any) { b.setAttribute("aria-current", k === i); });
-        if (!anim || p < 0) { fill(d, i); fes.forEach(function (e: any, k: any) { e.classList.toggle("on", k === i); }); ffs.forEach(function (el: any, k: any) { if(el) el.textContent = d.f[k]; }); return; }
+        if (!anim || p < 0) { fill(d, i); fes.forEach(function (e: any, k: any) { e.classList.toggle("on", k === i); }); ffs.forEach(function (el: any, k: any) { if (el) el.textContent = d.f[k]; }); return; }
         fes.forEach(function (e: any, k: any) {
           if (k === i) { e.classList.add("on"); G.fromTo(e, { opacity: 0, yPercent: dir * 34, rotation: dir * 14, scale: 0.86 }, { opacity: 1, yPercent: 0, rotation: 0, scale: 1, duration: 1.05, ease: "expo.out", delay: 0.08, overwrite: true }); }
           else if (k === p) { G.to(e, { opacity: 0, yPercent: -dir * 34, rotation: -dir * 14, scale: 0.86, duration: 0.5, ease: "power3.in", overwrite: true, onComplete: function () { e.classList.remove("on"); } }); } else { G.set(e, { opacity: 0 }); e.classList.remove("on"); }
@@ -280,95 +349,134 @@ export default function Home() {
         G.fromTo("#fd", { scale: 0.82 }, { scale: 1, duration: 1.1, ease: "expo.out", overwrite: true });
         var q = ["#fN", "#fNo", "#fEy", ".fcopy .row"];
         G.to(q, { yPercent: -dir * 30, opacity: 0, duration: 0.28, ease: "power2.in", overwrite: true, onComplete: function () { fill(D[fi], fi); G.fromTo(q, { yPercent: dir * 30, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.85, ease: "expo.out", stagger: 0.05 }); } });
-        ffs.forEach(function (el: any, k: any) { G.to(el, { scale: 0, rotation: -80, duration: 0.3, ease: "power2.in", delay: k * 0.03, overwrite: true, onComplete: function () { if(el) el.textContent = D[fi].f[k]; G.fromTo(el, { scale: 0, rotation: 80 }, { scale: 1, rotation: 0, duration: 1, ease: "back.out(1.6)" }); } }); });
+        ffs.forEach(function (el: any, k: any) { G.to(el, { scale: 0, rotation: -80, duration: 0.3, ease: "power2.in", delay: k * 0.03, overwrite: true, onComplete: function () { if (el) el.textContent = D[fi].f[k]; G.fromTo(el, { scale: 0, rotation: 80 }, { scale: 1, rotation: 0, duration: 1, ease: "back.out(1.6)" }); } }); });
       }
-      flvSet(0, 1); if($("#fB")) $("#fB").onclick = function () { if($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); };
+      flvSet(0, 1); if ($("#fB")) $("#fB").onclick = function () { if ($("#vendors")) $("#vendors").scrollIntoView({ behavior: anim ? "smooth" : "auto" }); };
 
       var V = [["Bhai Bhai Biryani", "🍛", 0, "4.8", "25 min", "৳220"], ["Ammu’s Kitchen", "🥟", 1, "4.7", "30 min", "৳60"], ["Mishti Ghor", "🍮", 2, "4.9", "35 min", "৳90"], ["Green Basket", "🥗", 3, "4.6", "40 min", "৳45"], ["Cha Adda", "🥤", 4, "4.8", "20 min", "৳60"], ["Crust & Co", "🥐", 5, "4.9", "30 min", "৳85"]];
       var trk = $("#trk"), sl = $("#sl");
-      if(trk) trk.innerHTML = V.map(function (v: any) { var c = D[v[2]]; return '<article class="card" style="--c:' + c.bg + ";--cd:" + c.deep + '"><div class="ca"><span>' + v[1] + "</span></div><h3>" + v[0] + "</h3><p>★ " + v[3] + " · " + v[4] + " · " + c.k + '</p><div class="cr"><span>from ' + v[5] + '</span><button class="add2" data-add data-n="' + v[0] + '" data-e="' + v[1] + '" data-p="' + v[5].replace(/\D/g, "") + '" data-v="' + c.k + '" aria-label="Add from ' + v[0] + '">Add</button></div></article>'; }).join("");
-      var X = 0, min = 0, dr: any = null, moved = false;
-      function lim() { if(sl && trk) min = Math.min(0, sl.clientWidth - trk.scrollWidth); }
+      if (trk) trk.innerHTML = V.map(function (v: any) { var c = D[v[2]]; return '<article class="card" style="--c:' + c.bg + ";--cd:" + c.deep + '"><div class="ca"><span>' + v[1] + "</span></div><h3>" + v[0] + "</h3><p>★ " + v[3] + " · " + v[4] + " · " + c.k + '</p><div class="cr"><span>from ' + v[5] + '</span><button class="add2" data-add data-n="' + D[v[2]].n + '" data-e="' + v[1] + '" data-p="' + v[5].replace(/\D/g, "") + '" data-v="' + c.k + '" aria-label="Add from ' + v[0] + '">Add</button></div></article>'; }).join(""); var X = 0, min = 0, dr: any = null, moved = false;
+      function lim() { if (sl && trk) min = Math.min(0, sl.clientWidth - trk.scrollWidth); }
       function setX(x: any, a: any) { X = G.utils.clamp(min, 0, x); G.to(trk, { x: X, duration: a && anim ? 0.9 : 0, ease: "expo.out", overwrite: true }); }
       lim(); window.addEventListener("resize", lim);
-      
-      if(sl) {
+
+      if (sl) {
         sl.addEventListener("pointerdown", function (e: any) { dr = { x: e.clientX, b: X, t: performance.now(), l: e.clientX, v: 0 }; moved = false; });
         sl.addEventListener("click", function (e: any) { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
         sl.addEventListener("wheel", function (e: any) { if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { e.preventDefault(); setX(X - e.deltaX, false); } }, { passive: false });
       }
-      var handlePointerMove = function (e: any) { if (!dr) return; var dx = e.clientX - dr.x; if (Math.abs(dx) > 6) { moved = true; if(sl) sl.classList.add("dr"); } if (!moved) return; var n = performance.now(); dr.v = (e.clientX - dr.l) / Math.max(1, n - dr.t); dr.l = e.clientX; dr.t = n; setX(dr.b + dx, false); };
-      var handlePointerUpVendors = function () { if (!dr) return; var d = dr; dr = null; if(sl) sl.classList.remove("dr"); if (moved) setX(X + d.v * 260, true); };
-      
+      var handlePointerMove = function (e: any) { if (!dr) return; var dx = e.clientX - dr.x; if (Math.abs(dx) > 6) { moved = true; if (sl) sl.classList.add("dr"); } if (!moved) return; var n = performance.now(); dr.v = (e.clientX - dr.l) / Math.max(1, n - dr.t); dr.l = e.clientX; dr.t = n; setX(dr.b + dx, false); };
+      var handlePointerUpVendors = function () { if (!dr) return; var d = dr; dr = null; if (sl) sl.classList.remove("dr"); if (moved) setX(X + d.v * 260, true); };
+
       window.addEventListener("pointermove", handlePointerMove);
       window.addEventListener("pointerup", handlePointerUpVendors);
-      
+
       var step = function () { return $(".card") ? $(".card").offsetWidth + 20 : 0; };
-      if($("#sp")) $("#sp").onclick = function () { setX(X + step(), true); }; 
-      if($("#sn")) $("#sn").onclick = function () { setX(X - step(), true); };
+      if ($("#sp")) $("#sp").onclick = function () { setX(X + step(), true); };
+      if ($("#sn")) $("#sn").onclick = function () { setX(X - step(), true); };
 
       var am = $("#am"), amBox = $("#amBox"), amLast: any = null;
       var COPY: any = { customer: ["Sign in", "Sign in or create an account", "Email", "Email me with news and offers"], seller: ["Sell on Khabo", "Create a seller account and open your shop", "Business email", "Email me seller tips and updates"] };
-      function amSet(m: any) { var c = COPY[m]; if(am) am.dataset.m = m; if($("#amT")) $("#amT").textContent = c[0]; if($("#amS")) $("#amS").textContent = c[1]; if($("#amE")) $("#amE").placeholder = c[2]; if($("#amE")) $("#amE").setAttribute("aria-label", c[2]); if($("#amCk")) $("#amCk").textContent = c[3]; $$("#amTabs button").forEach(function (b: any) { b.setAttribute("aria-selected", b.dataset.m === m); }); }
+      function amSet(m: any) { var c = COPY[m]; if (am) am.dataset.m = m; if ($("#amT")) $("#amT").textContent = c[0]; if ($("#amS")) $("#amS").textContent = c[1]; if ($("#amE")) $("#amE").placeholder = c[2]; if ($("#amE")) $("#amE").setAttribute("aria-label", c[2]); if ($("#amCk")) $("#amCk").textContent = c[3]; $$("#amTabs button").forEach(function (b: any) { b.setAttribute("aria-selected", b.dataset.m === m); }); }
       function openAcct(m: any) {
-        amLast = document.activeElement; amSet(m || "customer"); if($("#amMain")) $("#amMain").hidden = false; if($("#amOk")) $("#amOk").hidden = true; if($("#amErr")) $("#amErr").textContent = ""; if($("#amPhone")) $("#amPhone").value = ""; if($("#amPass")) $("#amPass").value = ""; if(am) am.hidden = false; root.classList.add("lock");
+        amLast = document.activeElement; amSet(m || "customer"); if ($("#amMain")) $("#amMain").hidden = false; if ($("#amOk")) $("#amOk").hidden = true; if ($("#amErr")) $("#amErr").textContent = ""; if ($("#amPhone")) $("#amPhone").value = ""; if ($("#amPass")) $("#amPass").value = ""; if (am) am.hidden = false; root.classList.add("lock");
         if (anim) { G.fromTo("#amSc", { opacity: 0 }, { opacity: 1, duration: 0.4 }); G.fromTo(amBox, { y: 60, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, duration: 0.9, ease: "expo.out" }); G.from($$("#amMain>*"), { y: 18, opacity: 0, duration: 0.8, ease: "expo.out", stagger: 0.05, delay: 0.15 }); }
-        setTimeout(function () { if($("#amPhone")) $("#amPhone").focus({ preventScroll: true }); }, 60);
+        setTimeout(function () { if ($("#amPhone")) $("#amPhone").focus({ preventScroll: true }); }, 60);
       }
       function closeAcct() {
-        var done = function () { if(am) am.hidden = true; root.classList.remove("lock"); if (amLast) amLast.focus(); };
+        var done = function () { if (am) am.hidden = true; root.classList.remove("lock"); if (amLast) amLast.focus(); };
         if (anim) { G.to(amBox, { y: 40, opacity: 0, duration: 0.35, ease: "power2.in" }); G.to("#amSc", { opacity: 0, duration: 0.35, onComplete: done }); } else done();
       }
-      
-      if($("#acct")) $("#acct").addEventListener("click", function () { openAcct("customer"); });
-      if($("#startSell")) $("#startSell").addEventListener("click", function () { openAcct("seller"); });
-      if($("#amX")) $("#amX").addEventListener("click", closeAcct); 
-      if($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
-      $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if($("#amErr")) $("#amErr").textContent = ""; }); });
-      
+
+      if ($("#acct")) $("#acct").addEventListener("click", function () { openAcct("customer"); });
+      if ($("#startSell")) $("#startSell").addEventListener("click", function () { openAcct("seller"); });
+      if ($("#amX")) $("#amX").addEventListener("click", closeAcct);
+      if ($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
+      $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if ($("#amErr")) $("#amErr").textContent = ""; }); });
+
       var handleKeydownAcct = function (e: any) {
-        if(!am || am.hidden) return; if (e.key === "Escape") { closeAcct(); return; } if (e.key !== "Tab") return;
+        if (!am || am.hidden) return; if (e.key === "Escape") { closeAcct(); return; } if (e.key !== "Tab") return;
         var f = $$("button,input,a[href]", amBox).filter(function (x: any) { return x.offsetParent && !x.closest("[hidden]"); }); if (!f.length) return; var a = f[0], z = f[f.length - 1];
         if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
       };
       document.addEventListener("keydown", handleKeydownAcct);
-      
-      // ফোন এবং পাসওয়ার্ড লগইন ফাংশন
-      if($("#amF")) $("#amF").addEventListener("submit", function (e: any) {
-        e.preventDefault();
-        var phone = $("#amPhone").value.trim();
-        var pass = $("#amPass").value.trim();
-        var err = $("#amErr");
-        var selectedRole = am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
 
-        if (phone.length < 11) {
-          err.textContent = "Please enter a valid phone number (e.g. 01712345678).";
-          return;
-        }
-        if (pass.length < 4) {
-          err.textContent = "Password must be at least 4 characters.";
-          return;
-        }
+      // Phone and Password Login
+      if ($("#amF")) {
+        $("#amF").addEventListener("submit", async function (e: any) {
+          e.preventDefault();
 
-        err.textContent = "Please wait...";
-        
-        signIn("credentials", { 
-          phone: phone, 
-          password: pass,
-          role: selectedRole,
-          callbackUrl: "/dashboard" 
+          const phone = $("#amPhone")?.value.trim();
+          const pass = $("#amPass")?.value.trim();
+          const err = $("#amErr");
+          const submitBtn = $("#amF button[type='submit']");
+
+          const selectedRole =
+            am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
+
+          if (!phone || phone.length < 11) {
+            err.textContent = "Please enter a valid phone number.";
+            return;
+          }
+
+          if (!pass || pass.length < 4) {
+            err.textContent = "Password must be at least 4 characters.";
+            return;
+          }
+
+          err.textContent = "Please wait...";
+
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Signing in...";
+          }
+
+          try {
+            const result = await signIn("credentials", {
+              phone,
+              password: pass,
+              role: selectedRole,
+              redirect: false,
+            });
+
+            if (!result || result.error) {
+              err.textContent = "Invalid phone number or password.";
+              return;
+            }
+
+            const session = await getSession();
+            const userRole = (session?.user as any)?.role;
+
+            if (userRole === "ADMIN") {
+              window.location.assign("/admin");
+            } else if (userRole === "VENDOR") {
+              window.location.assign("/vendor");
+            } else if (userRole === "CUSTOMER") {
+              window.location.assign("/dashboard");
+            } else {
+              err.textContent = "Account role not found. Please contact support.";
+            }
+          } catch (error) {
+            console.error("Login error:", error);
+            err.textContent = "Something went wrong. Please try again.";
+          } finally {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Continue";
+            }
+          }
         });
-      });
+      }
 
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
       var set = '<div class="set">' + items.map(function (i) { return "<span>" + i[0] + "</span><i>" + i[1] + "</i>"; }).join("") + "</div>";
-      var mqEl = $("#mq"); if(mqEl) mqEl.innerHTML = set + set + set + set;
+      var mqEl = $("#mq"); if (mqEl) mqEl.innerHTML = set + set + set + set;
       function clampV(v: any, a: any, b: any) { return Math.max(a, Math.min(b, v)); }
 
       ST.create({ trigger: "#top", start: "top top", end: "bottom top", onToggle: function (s: any) { inView = s.isActive; } });
       ST.create({ trigger: whyEl, start: "top top", end: "bottom bottom", onUpdate: function (s: any) { var i = Math.min(S.length - 1, Math.floor(s.progress * S.length)); if (i !== wi) whySet(i, s.direction || 1); if (anim) G.set($$("#wV>div span"), { rotation: Math.sin(s.progress * Math.PI * 5) * 7 }); } });
-      ST.create({ trigger: flvEl, start: "top top", end: "bottom bottom", onUpdate: function (s: any) { var i = Math.min(N - 1, Math.floor(s.progress * N)); if (i !== fi) flvSet(i, s.direction || 1); if($("#fill")) $("#fill").style.transform = "scaleY(" + s.progress + ")"; } });
-      
+      ST.create({ trigger: flvEl, start: "top top", end: "bottom bottom", onUpdate: function (s: any) { var i = Math.min(N - 1, Math.floor(s.progress * N)); if (i !== fi) flvSet(i, s.direction || 1); if ($("#fill")) $("#fill").style.transform = "scaleY(" + s.progress + ")"; } });
+
       if (anim) {
         G.to(".hero-ui", { yPercent: 30, opacity: 0, ease: "none", scrollTrigger: { trigger: "#top", start: "top top", end: "bottom top", scrub: true } });
         G.to("#stage", { yPercent: -8, scale: 0.94, ease: "none", scrollTrigger: { trigger: "#top", start: "top top", end: "bottom top", scrub: true } });
@@ -377,9 +485,9 @@ export default function Home() {
         ST.create({ trigger: ".stmt", start: "top bottom", end: "bottom top", onUpdate: function (s: any) { var v = s.getVelocity(), d = s.direction < 0 ? -1 : 1, b = Math.min(6, 1 + Math.abs(v) / 350); G.to(mq, { timeScale: b * d, duration: 0.2, overwrite: true, onComplete: function () { G.to(mq, { timeScale: d, duration: 1.2 }); } }); G.to(".mq", { skewX: clampV(-v / 500, -6, 6), duration: 0.4, overwrite: true, onComplete: function () { G.to(".mq", { skewX: 0, duration: 0.8 }); } }); } });
         $$("[data-split]").forEach(function (el: any) { G.from(words(el), { yPercent: 110, duration: 1.05, ease: "expo.out", stagger: 0.04, scrollTrigger: { trigger: el, start: "top 88%", once: true } }); });
         ST.batch(".card", { start: "top 92%", once: true, onEnter: function (b: any) { G.fromTo(b, { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: "expo.out", stagger: 0.07, overwrite: true }); } });
-        var cn = { v: 0 }; ST.create({ trigger: "#sc", start: "top 85%", once: true, onEnter: function () { G.to(cn, { v: 1200, duration: 2.2, ease: "power3.out", onUpdate: function () { if($("#sc")) $("#sc").textContent = Math.round(cn.v).toLocaleString("en-US"); } }); } });
+        var cn = { v: 0 }; ST.create({ trigger: "#sc", start: "top 85%", once: true, onEnter: function () { G.to(cn, { v: 1200, duration: 2.2, ease: "power3.out", onUpdate: function () { if ($("#sc")) $("#sc").textContent = Math.round(cn.v).toLocaleString("en-US"); } }); } });
         G.from("#mark", { yPercent: 45, duration: 1.4, ease: "expo.out", scrollTrigger: { trigger: "#mark", start: "top 98%", once: true } });
-        
+
         G.timeline({ defaults: { ease: "expo.out" }, onComplete: arm })
           .from(hbs[0] ? hbs[0].firstChild : null, { yPercent: 60, rotation: 14, scale: 0.7, opacity: 0, duration: 1.5 }, 0.15)
           .from(hbs.slice(1).map(function (e: any) { return e.firstChild; }), { yPercent: 40, scale: 0.5, opacity: 0, duration: 1.25, stagger: 0.07 }, 0.5)
@@ -387,23 +495,43 @@ export default function Home() {
           .from([".hero-ui", "#hMeta", ".ctrl"], { y: 24, opacity: 0, duration: 1, stagger: 0.06 }, 0.85)
           .fromTo("#hAdd", { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "back.out(2)" }, 1.2)
           .from(".nav", { y: -30, opacity: 0, duration: 1 }, 0.95);
-      } else { if($("#sc")) $("#sc").textContent = "1,200"; }
+      } else { if ($("#sc")) $("#sc").textContent = "1,200"; }
 
-      return () => {
-        clearTimeout(checkGSAP);
+      cleanup = () => {
+        if (checkGSAP) clearTimeout(checkGSAP);
+
         window.removeEventListener("scroll", handleScroll);
         document.removeEventListener("click", handleDocumentClick);
         document.removeEventListener("keydown", handleKeydownCart);
         document.removeEventListener("keydown", handleKeydownAcct);
+
         window.removeEventListener("pointerup", handlePointerUp);
         window.removeEventListener("pointerup", handlePointerUpVendors);
         window.removeEventListener("pointermove", handlePointerMove);
         window.removeEventListener("resize", handleResize);
+        window.removeEventListener("resize", lim);
+
+        if (typeof ST.getAll === "function") {
+          ST.getAll().forEach((trigger: any) => trigger.kill());
+        }
+
+        clearTimeout(autoT);
       };
     };
 
     initAnimation();
-  }, [router]);
+
+    return () => {
+      disposed = true;
+
+      if (checkGSAP) {
+        clearTimeout(checkGSAP);
+      }
+
+      cleanup?.();
+      initialized.current = false;
+    };
+  }, []);
 
   return (
     <>
@@ -413,7 +541,8 @@ export default function Home() {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@500;700&family=DM+Mono:wght@500&display=swap" />
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         :root{--ink:#170f1b;--ice:#f3f6f1;--bg:#ff9b54;--deep:#4a1a00;--tint:#ffc08e;--label:#fff4ea;--fd:"Bricolage Grotesque","Arial Black",system-ui,sans-serif;--fb:"Figtree",system-ui,sans-serif;--fm:"DM Mono",ui-monospace,monospace;--ease:cubic-bezier(.2,.8,.2,1);--hdr:86px;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
         html{scroll-padding-top:env(safe-area-inset-top,0px)}*,*::before,*::after{box-sizing:border-box}html,body{overflow-x:clip}
         body{margin:0;background:var(--ice);color:var(--ink);font:1.0625rem/1.55 var(--fb);-webkit-font-smoothing:antialiased}
@@ -517,10 +646,16 @@ export default function Home() {
         .co-success-icon{width:80px;height:80px;background:#e6f7eb;border-radius:50%;display:grid;place-items:center;margin:0 auto 20px;color:#1daf52}
         .co-success h2{font-size:2rem;margin-bottom:10px;font-family:var(--fd);color:var(--ink)}
         .co-success p{color:#666;margin-bottom:24px}
+        .co-section-title{font-weight:700;font-size:.9rem;margin:14px 0 6px;color:var(--ink);}
+        .co-fields{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+        .co-input{border:1.5px solid #dcdcd8;border-radius:10px;padding:10px 12px;font:inherit;font-size:.9rem;outline:0;background:#fff;color:var(--ink);}
+        .co-input:focus{border-color:var(--deep);}
+        .co-box{max-height:calc(100svh - 32px);overflow:auto;}
         @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
       `}} />
 
-      <div dangerouslySetInnerHTML={{ __html: `
+      <div dangerouslySetInnerHTML={{
+        __html: `
         <header class="hdr" id="hdr"><div class="nav"><a class="logo" href="#top">khabo</a>
           <ul><li><a href="#why">Why Khabo</a></li><li><a href="#cats">Categories</a></li><li><a href="#vendors">Kitchens</a></li><li><a href="#sell">Sell with us</a></li></ul>
           <div class="nr"><button class="bag" id="acct" aria-label="Sign in or create an account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg></button><button class="bag" id="bag" aria-label="Open bag">🛍<b id="bagN" data-n="0">0</b></button></div></div></header>
@@ -573,42 +708,53 @@ export default function Home() {
             <div id="coMainBox">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <h2 class="co-title">Checkout</h2>
-                <button class="ibtn" id="coClose" style="width:36px;height:36px;font-size:1rem;border-width:1.5px;">✕</button>
+                <button class="ibtn" id="coClose" type="button" style="width:36px;height:36px;font-size:1rem;border-width:1.5px;">✕</button>
               </div>
-              
+
               <div class="co-total-box">
-                <span>Total Amount:</span>
+                <span>Total:</span>
                 <span id="coTotal" style="color:var(--deep);">৳0</span>
               </div>
 
-              <p style="font-weight:600;margin-bottom:10px;font-size:0.95rem;">Select Payment Method</p>
+              <div class="co-section-title">📍 Delivery Address</div>
+              <div class="co-fields">
+                <input id="coName" class="co-input" type="text" placeholder="Full name" />
+                <input id="coPhone" class="co-input" type="tel" placeholder="Phone (01XXXXXXXXX)" />
+                <input id="coArea" class="co-input" type="text" placeholder="Area / District" />
+                <textarea id="coAddr" class="co-input" rows="2" placeholder="Full address"></textarea>
+              </div>
+
+              <div class="co-section-title">💳 Payment Method</div>
               <div class="pay-methods">
-                <button class="pay-btn active" data-method="bkash">
-                  <span style="font-size:1.5rem;">📱</span> bKash
-                </button>
-                <button class="pay-btn" data-method="nagad">
-                  <span style="font-size:1.5rem;">💳</span> Nagad
-                </button>
-                <button class="pay-btn" data-method="rocket">
-                  <span style="font-size:1.5rem;">🚀</span> Rocket
-                </button>
+                <button class="pay-btn active" type="button" data-method="BKASH"><span style="font-size:1.5rem;">📱</span> bKash</button>
+                <button class="pay-btn" type="button" data-method="NAGAD"><span style="font-size:1.5rem;">💳</span> Nagad</button>
+                <button class="pay-btn" type="button" data-method="COD"><span style="font-size:1.5rem;">💵</span> COD</button>
               </div>
 
-              <div class="pay-info">
+              <div id="coMobileBox" class="pay-info">
                 <p>Send Money to (Personal)</p>
-                <div class="pay-number">01323374428</div>
+                <div class="pay-number" id="coPayNumber">01323374428</div>
+                <input id="coSender" class="co-input" type="tel" placeholder="Your bKash/Nagad number" style="margin-top:10px;" />
+                <input id="coTrx" class="co-input" type="text" placeholder="TrxID (e.g. 9F2A1B3C)" style="margin-top:8px;" />
               </div>
 
-              <button class="btn" id="payConfirm" style="width:100%;justify-content:center;background:var(--deep);color:var(--label);">Confirm Payment</button>
+              <div id="coCODBox" class="pay-info" style="display:none;background:#f0fff4;border-color:#b8e6c1;">
+                <p>💵 Delivery-তে cash দিন। কোনো advance লাগবে না।</p>
+              </div>
+
+              <p class="err" id="coErr" role="alert" style="margin:8px 0 0;"></p>
+
+              <button class="btn" id="payConfirm" type="button" style="width:100%;justify-content:center;background:var(--deep);color:var(--label);margin-top:12px;">Place Order</button>
             </div>
 
             <div class="co-success" id="coSuccessBox" hidden>
               <div class="co-success-icon">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
               </div>
-              <h2>Thank You!</h2>
-              <p>Your order has been successfully placed.</p>
-              <button class="btn" id="coSuccessClose" style="width:100%;justify-content:center;background:var(--deep);color:var(--label);">Close</button>
+              <h2>Order Placed!</h2>
+              <p id="coSuccessMsg">Your order has been placed successfully.</p>
+              <p id="coOrderNum" style="font-family:var(--fm);font-size:.9rem;color:var(--deep);margin-bottom:16px;"></p>
+              <button class="btn" id="coSuccessClose" type="button" style="width:100%;justify-content:center;background:var(--deep);color:var(--label);">Close</button>
             </div>
           </div>
         </div>

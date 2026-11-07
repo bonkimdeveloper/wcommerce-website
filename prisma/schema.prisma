@@ -7,42 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ═══════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════
 enum Role {
   CUSTOMER
   VENDOR
   ADMIN
 }
 
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  COD
+  SSLCOMMERZ   // legacy, unused
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING_VERIFICATION
+  PAID
+  FAILED
+  REFUNDED
+}
+
 enum OrderStatus {
   PENDING
-  PAID
+  CONFIRMED
+  PAID         // legacy — use paymentStatus=PAID instead
   PROCESSING
   SHIPPED
   DELIVERED
   CANCELLED
+  RETURNED
 }
 
-enum PaymentMethod {
-  BKASH
-  NAGAD
-  SSLCOMMERZ
-  COD
+// ═══════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
-  phone         String?   @unique // নতুন ফিল্ড: ফোন নাম্বার
-  password      String?            // নতুন ফিল্ড: পাসওয়ার্ড
   emailVerified DateTime?
   image         String?
+  phone         String    @unique
+  password      String?
   role          Role      @default(CUSTOMER)
-  accounts      Account[]
-  sessions      Session[]
-  vendor        Vendor?
-  orders        Order[]
   createdAt     DateTime  @default(now())
+
+  accounts  Account[]
+  sessions  Session[]
+  orders    Order[]
+  vendor    Vendor?
+  addresses Address[]
 }
 
 model Account {
@@ -51,15 +79,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -69,8 +96,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -81,17 +107,47 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ═══════════════════════════════════════════════
+// VENDOR
+// ═══════════════════════════════════════════════
 model Vendor {
-  id         String    @id @default(cuid())
-  userId     String    @unique
+  id         String   @id @default(cuid())
+  userId     String   @unique
   shopName   String
-  area       String    @default("")
-  approved   Boolean   @default(false)
-  commission Float     @default(10)
-  user       User      @relation(fields: [userId], references: [id])
-  products   Product[]
+  area       String   @default("")
+  approved   Boolean  @default(false)
+  commission Float    @default(5)   // 5% default
+  createdAt  DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products    Product[]
+  orderItems  OrderItem[]
+  commissions Commission[]
+  balance     VendorBalance?
+  withdrawals Withdrawal[]
 }
 
+// ═══════════════════════════════════════════════
+// ADDRESS
+// ═══════════════════════════════════════════════
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  label     String  @default("Home")
+  fullName  String
+  phone     String
+  division  String
+  district  String
+  area      String
+  address   String
+  isDefault Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════
+// PRODUCT
+// ═══════════════════════════════════════════════
 model Category {
   id       String    @id @default(cuid())
   name     String
@@ -100,39 +156,118 @@ model Category {
 }
 
 model Product {
-  id          String      @id @default(cuid())
-  vendorId    String
-  categoryId  String
-  title       String
-  description String      @default("")
-  price       Int
-  stock       Int         @default(100)
-  active      Boolean     @default(true)
-  vendor      Vendor      @relation(fields: [vendorId], references: [id])
-  category    Category    @relation(fields: [categoryId], references: [id])
-  items       OrderItem[]
+  id           String   @id @default(cuid())
+  vendorId     String
+  categoryId   String
+  title        String
+  description  String   @default("")
+  price        Int
+  stock        Int      @default(100)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  category Category    @relation(fields: [categoryId], references: [id])
+  vendor   Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items    OrderItem[]
 }
 
+// ═══════════════════════════════════════════════
+// ORDER
+// ═══════════════════════════════════════════════
 model Order {
-  id        String        @id @default(cuid())
-  userId    String
-  total     Int
-  status    OrderStatus   @default(PENDING)
-  method    PaymentMethod
-  tranId    String?       @unique
-  address   Json
-  createdAt DateTime      @default(now())
-  user      User          @relation(fields: [userId], references: [id])
-  items     OrderItem[]
+  id            String        @id @default(cuid())
+  orderNumber   String?       @unique
+  userId        String
+  subtotal      Int           @default(0)
+  deliveryFee   Int           @default(0)
+  total         Int
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  method        PaymentMethod
+  tranId        String?       @unique    // legacy
+  address       Json
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payment     Payment?
+  commissions Commission[]
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
+  id               String @id @default(cuid())
+  orderId          String
+  productId        String
+  vendorId         String
+  productTitle     String @default("")   // snapshot
+  qty              Int
+  price            Int                    // snapshot
+  commissionRate   Float  @default(5)
+  commissionAmount Int    @default(0)
+  vendorEarning    Int    @default(0)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  vendor  Vendor  @relation(fields: [vendorId], references: [id])
+}
+
+// ═══════════════════════════════════════════════
+// PAYMENT
+// ═══════════════════════════════════════════════
+model Payment {
+  id           String        @id @default(cuid())
+  orderId      String        @unique
+  method       PaymentMethod
+  amount       Int
+  status       PaymentStatus @default(UNPAID)
+  senderNumber String?
+  trxId        String?
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  refundNote   String?
+  createdAt    DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════
+// COMMISSION & BALANCE
+// ═══════════════════════════════════════════════
+model Commission {
+  id        String   @id @default(cuid())
   orderId   String
-  productId String
   vendorId  String
-  qty       Int
-  price     Int
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
+  rate      Float
+  amount    Int
+  isSettled Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+}
+
+model VendorBalance {
+  id          String   @id @default(cuid())
+  vendorId    String   @unique
+  available   Int      @default(0)
+  pending     Int      @default(0)
+  totalEarned Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model Withdrawal {
+  id        String   @id @default(cuid())
+  vendorId  String
+  amount    Int
+  method    String   // bkash / nagad
+  accountNo String
+  status    String   @default("PENDING")  // PENDING/APPROVED/PAID/REJECTED
+  note      String?
+  createdAt DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
