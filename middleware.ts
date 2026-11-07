@@ -14,21 +14,20 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ২. লগইন না থাকলে
+  // ২. টোকেন না থাকলে
   if (!token) {
     if (pathname.startsWith("/admin")) {
-      // অ্যাডমিন হলে অ্যাডমিন লগইনে পাঠাবে
       return NextResponse.redirect(new URL("/admin/login", req.url));
     }
-    // অন্যরা হোমপেজে যাবে
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // ৩. রোল চেক
+  // ৩. কাস্টমার যদি /admin এ ঢুকতে চায়, তবে তাকে /admin/login এ পাঠাবে
   if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
-  
+
+  // ৪. ভেন্ডর পেজের জন্য
   if (pathname.startsWith("/vendor") && token.role !== "VENDOR" && token.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/", req.url));
   }

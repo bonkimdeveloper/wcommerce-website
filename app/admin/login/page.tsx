@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, getSession } from "next-auth/react";
+import { signIn, getSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
@@ -23,6 +23,10 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
+      // ১. আগের কাস্টমার সেশন থাকলে তা মুছে ফেলবে (যাতে কনফ্লিক্ট না হয়)
+      await signOut({ redirect: false });
+
+      // ২. নতুন অ্যাডমিন লগইন
       const res = await signIn("credentials", {
         phone,
         password,
@@ -43,6 +47,7 @@ export default function AdminLoginPage() {
         return;
       }
 
+      // ৩. সফল হলে অ্যাডমিন ড্যাশবোর্ডে রিডাইরেক্ট
       router.push("/admin");
       router.refresh();
     } catch (err) {
