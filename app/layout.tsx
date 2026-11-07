@@ -1,4 +1,5 @@
 import "./globals.css";
+import Providers from "@/components/Providers"; // নতুন যুক্ত হলো
 
 export const metadata = { title: "Khabo – local food marketplace" };
 export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@500;700&family=DM+Mono:wght@500&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers> {/* এখানে Providers দিয়ে র্যাপ করা হলো */}
+      </body>
     </html>
   );
 }
