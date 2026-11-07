@@ -14,7 +14,6 @@ export default async function Dashboard() {
     redirect("/");
   }
 
-  // ইমেইলের বদলে ইউজার আইডি দিয়ে ডাটা খোঁজা হচ্ছে (যাতে ফোন লগইনে ক্র্যাশ না করে)
   const dbUser = await db.user.findUnique({ where: { id: user.id } });
   
   const orders = await db.order.findMany({
@@ -24,17 +23,17 @@ export default async function Dashboard() {
   });
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f3f6f1", fontFamily: "var(--fb, system-ui)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f3f6f1", fontFamily: "system-ui, sans-serif", flexDirection: "row", flexWrap: "wrap" }}>
       
       {/* সাইডবার */}
-      <aside style={{ width: "260px", background: "#fff", padding: "30px 20px", borderRight: "1px solid #eaeaea", display: "flex", flexDirection: "column" }}>
+      <aside style={{ width: "100%", maxWidth: "280px", background: "#fff", padding: "30px 20px", borderRight: "1px solid #eaeaea", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "40px" }}>
-          <div style={{ width: "45px", height: "45px", borderRadius: "50%", background: "#ff9b54", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: "bold" }}>
+          <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#ff9b54", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem", fontWeight: "bold" }}>
             {dbUser?.name?.charAt(0).toUpperCase() || "U"}
           </div>
           <div>
             <h2 style={{ fontSize: "1.1rem", margin: 0, fontWeight: 700 }}>{dbUser?.name || "User"}</h2>
-            <p style={{ fontSize: "0.8rem", color: "#666", margin: 0 }}>{dbUser?.phone || dbUser?.email}</p>
+            <p style={{ fontSize: "0.85rem", color: "#666", margin: 0 }}>{dbUser?.phone || dbUser?.email}</p>
           </div>
         </div>
 
@@ -57,10 +56,10 @@ export default async function Dashboard() {
       </aside>
 
       {/* মেইন কনটেন্ট */}
-      <main style={{ flex: 1, padding: "40px" }}>
-        <div style={{ maxWidth: "900px" }}>
+      <main style={{ flex: 1, padding: "40px 20px", minWidth: "300px" }}>
+        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <div style={{ background: "#fff", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", marginBottom: "30px" }}>
-            <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", fontFamily: "var(--fd, sans-serif)" }}>Welcome back, {dbUser?.name?.split(" ")[0] || "User"}! 👋</h1>
+            <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", fontFamily: "sans-serif" }}>Welcome back, {dbUser?.name?.split(" ")[0] || "User"}! 👋</h1>
             <p style={{ color: "#666", margin: 0 }}>Here you can track your recent orders and manage your account.</p>
           </div>
 
@@ -78,15 +77,15 @@ export default async function Dashboard() {
               {orders.map((order) => (
                 <div key={order.id} style={{ background: "#fff", padding: "20px", borderRadius: "16px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", gap: "15px" }}>
                   
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "15px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eee", paddingBottom: "15px", flexWrap: "wrap", gap: "10px" }}>
                     <div>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Order #{order.id.slice(-6).toUpperCase()}</p>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Order #{order.orderNumber || order.id.slice(-6).toUpperCase()}</p>
                       <p style={{ margin: "4px 0 0", color: "#666", fontSize: "0.85rem" }}>{new Date(order.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <span style={{ 
-                        background: order.status === 'PAID' ? '#dcfce7' : order.status === 'PENDING' ? '#fef08a' : '#fee2e2', 
-                        color: order.status === 'PAID' ? '#166534' : order.status === 'PENDING' ? '#854d0e' : '#991b1b',
+                        background: order.status === 'DELIVERED' ? '#dcfce7' : order.status === 'CONFIRMED' ? '#dbeafe' : order.status === 'PENDING' ? '#fef08a' : '#fee2e2', 
+                        color: order.status === 'DELIVERED' ? '#166534' : order.status === 'CONFIRMED' ? '#1e40af' : order.status === 'PENDING' ? '#854d0e' : '#991b1b',
                         padding: "6px 12px", borderRadius: "99px", fontSize: "0.8rem", fontWeight: 700 
                       }}>
                         {order.status}
@@ -97,7 +96,7 @@ export default async function Dashboard() {
                   <div>
                     {order.items.map((item: any) => (
                       <div key={item.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "0.95rem" }}>
-                        <span>{item.qty} × {item.product.title}</span>
+                        <span>{item.qty} × {item.product?.title || item.productTitle}</span>
                         <span style={{ fontWeight: 600 }}>৳{item.price * item.qty}</span>
                       </div>
                     ))}

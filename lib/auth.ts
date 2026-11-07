@@ -77,6 +77,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             phone: user.phone,
             role: user.role,
+            image: user.image, // ইমেজ সেশনে পাঠানো হলো
           } as any;
         } catch (error: any) {
           console.error("❌ AUTHORIZE ERROR:", error);
@@ -87,11 +88,21 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = (user as any).role;
         token.uid = user.id;
+        token.phone = (user as any).phone;
+        token.image = (user as any).image;
       }
+      
+      // যদি প্রোফাইল আপডেট হয়, তবে সেশনেও আপডেট হবে
+      if (trigger === "update" && session) {
+        token.name = session.name;
+        token.phone = session.phone;
+        token.image = session.image;
+      }
+
       return token;
     },
 
@@ -99,6 +110,9 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).id = token.uid;
+        (session.user as any).phone = token.phone;
+        (session.user as any).image = token.image;
+        session.user.name = token.name;
       }
       return session;
     },

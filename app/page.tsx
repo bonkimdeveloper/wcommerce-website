@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Script from "next/script";
-import { signIn, getSession } from "next-auth/react";
+import { signIn, getSession, signOut } from "next-auth/react";
 
 export default function Home() {
   const initialized = useRef(false);
@@ -388,84 +388,88 @@ export default function Home() {
         if (anim) { G.to(amBox, { y: 40, opacity: 0, duration: 0.35, ease: "power2.in" }); G.to("#amSc", { opacity: 0, duration: 0.35, onComplete: done }); } else done();
       }
 
-      if ($("#acct")) $("#acct").addEventListener("click", function () { openAcct("customer"); });
-      if ($("#startSell")) $("#startSell").addEventListener("click", function () { openAcct("seller"); });
-      if ($("#amX")) $("#amX").addEventListener("click", closeAcct);
-      if ($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
-      $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if ($("#amErr")) $("#amErr").textContent = ""; }); });
+      if ($("#acct")) {
+        if ($("#startSell")) $("#startSell").addEventListener("click", function () { openAcct("seller"); });
+        if ($("#amX")) $("#amX").addEventListener("click", closeAcct);
+        if ($("#amSc")) $("#amSc").addEventListener("click", closeAcct);
+        $$("#amTabs button").forEach(function (b: any) { b.addEventListener("click", function () { amSet(b.dataset.m); if ($("#amErr")) $("#amErr").textContent = ""; }); });
 
-      var handleKeydownAcct = function (e: any) {
-        if (!am || am.hidden) return; if (e.key === "Escape") { closeAcct(); return; } if (e.key !== "Tab") return;
-        var f = $$("button,input,a[href]", amBox).filter(function (x: any) { return x.offsetParent && !x.closest("[hidden]"); }); if (!f.length) return; var a = f[0], z = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
-      };
-      document.addEventListener("keydown", handleKeydownAcct);
+        var handleKeydownAcct = function (e: any) {
+          if (!am || am.hidden) return; if (e.key === "Escape") { closeAcct(); return; } if (e.key !== "Tab") return;
+          var f = $$("button,input,a[href]", amBox).filter(function (x: any) { return x.offsetParent && !x.closest("[hidden]"); }); if (!f.length) return; var a = f[0], z = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+        };
+        document.addEventListener("keydown", handleKeydownAcct);
 
-      // Phone and Password Login
-      if ($("#amF")) {
-        $("#amF").addEventListener("submit", async function (e: any) {
-          e.preventDefault();
+        // Phone and Password Login
+        if ($("#amF")) {
+          $("#amF").addEventListener("submit", async function (e: any) {
+            e.preventDefault();
 
-          const phone = $("#amPhone")?.value.trim();
-          const pass = $("#amPass")?.value.trim();
-          const err = $("#amErr");
-          const submitBtn = $("#amF button[type='submit']");
+            const phone = $("#amPhone")?.value.trim();
+            const pass = $("#amPass")?.value.trim();
+            const err = $("#amErr");
+            const submitBtn = $("#amF button[type='submit']");
 
-          const selectedRole =
-            am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
+            const selectedRole = am?.dataset.m === "seller" ? "VENDOR" : "CUSTOMER";
 
-          if (!phone || phone.length < 11) {
-            err.textContent = "Please enter a valid phone number.";
-            return;
-          }
-
-          if (!pass || pass.length < 4) {
-            err.textContent = "Password must be at least 4 characters.";
-            return;
-          }
-
-          err.textContent = "Please wait...";
-
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Signing in...";
-          }
-
-          try {
-            const result = await signIn("credentials", {
-              phone,
-              password: pass,
-              role: selectedRole,
-              redirect: false,
-            });
-
-            if (!result || result.error) {
-              err.textContent = "Invalid phone number or password.";
+            if (!phone || phone.length < 11) {
+              if (err) err.textContent = "Please enter a valid phone number.";
               return;
             }
 
-            const session = await getSession();
-            const userRole = (session?.user as any)?.role;
+            if (!pass || pass.length < 4) {
+              if (err) err.textContent = "Password must be at least 4 characters.";
+              return;
+            }
 
-            if (userRole === "ADMIN") {
-              window.location.assign("/admin");
-            } else if (userRole === "VENDOR") {
-              window.location.assign("/vendor");
-            } else if (userRole === "CUSTOMER") {
-              window.location.assign("/dashboard");
-            } else {
-              err.textContent = "Account role not found. Please contact support.";
-            }
-          } catch (error) {
-            console.error("Login error:", error);
-            err.textContent = "Something went wrong. Please try again.";
-          } finally {
+            if (err) err.textContent = "Please wait...";
+
             if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = "Continue";
+              submitBtn.disabled = true;
+              submitBtn.textContent = "Signing in...";
             }
-          }
-        });
+
+            try {
+              const result = await signIn("credentials", {
+                phone,
+                password: pass,
+                role: selectedRole,
+                redirect: false,
+              });
+
+              if (!result || result.error) {
+                if (err) err.textContent = "Invalid phone number or password.";
+                return;
+              }
+
+              const session = await getSession();
+              const userRole = (session?.user as any)?.role;
+              const userName = (session?.user as any)?.name || "User";
+
+              // ইউজারের নাম লোকাল স্টোরেজে সেভ করা হলো
+              localStorage.setItem("khabo-user-name", userName);
+
+              if (userRole === "ADMIN") {
+                window.location.assign("/admin");
+              } else if (userRole === "VENDOR") {
+                window.location.assign("/vendor");
+              } else if (userRole === "CUSTOMER") {
+                window.location.assign("/dashboard");
+              } else {
+                if (err) err.textContent = "Account role not found. Please contact support.";
+              }
+            } catch (error) {
+              console.error("Login error:", error);
+              if (err) err.textContent = "Something went wrong. Please try again.";
+            } finally {
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Continue";
+              }
+            }
+          });
+        }
       }
 
       var items = [["20 min delivery", "🛵"], ["verified kitchens", "✅"], ["cash on delivery", "💵"], ["fresh every day", "🥬"], ["pay with bKash", "📱"], ["no hidden fees", "🧾"]];
@@ -497,13 +501,47 @@ export default function Home() {
           .from(".nav", { y: -30, opacity: 0, duration: 1 }, 0.95);
       } else { if ($("#sc")) $("#sc").textContent = "1,200"; }
 
+      // === ইউজার নেম ও ড্রপডাউন লজিক ===
+      var savedName = localStorage.getItem("khabo-user-name");
+      if (savedName && $("#userNameDisplay") && $("#acct")) {
+        $("#userNameDisplay").textContent = savedName;
+        $("#userNameDisplay").style.display = "inline";
+        $("#acct").setAttribute("aria-label", "Profile of " + savedName);
+        
+        // আইকনে ক্লিক করলে ড্রপডাউন ওপেন/ক্লোজ হবে
+        $("#acct").addEventListener("click", function (e: any) {
+          e.stopPropagation();
+          var dd = $("#profileDropdown");
+          if(dd) dd.style.display = dd.style.display === "none" ? "flex" : "none";
+        });
+
+        // বাইরে ক্লিক করলে ড্রপডাউন বন্ধ হবে
+        document.addEventListener("click", function (e: any) {
+          var dd = $("#profileDropdown");
+          if(dd && !e.target.closest("#acct") && !e.target.closest("#profileDropdown")) {
+            dd.style.display = "none";
+          }
+        });
+
+        // লগআউট বাটন
+        if($("#btnLogout")) {
+          $("#btnLogout").addEventListener("click", async function() {
+            localStorage.removeItem("khabo-user-name");
+            const { signOut } = await import("next-auth/react");
+            await signOut({ callbackUrl: "/" });
+          });
+        }
+      } else if ($("#acct")) {
+        // লগইন না থাকলে আগের মতোই একাউন্ট মডাল ওপেন হবে
+        $("#acct").addEventListener("click", function () { openAcct("customer"); });
+      }
+
       cleanup = () => {
         if (checkGSAP) clearTimeout(checkGSAP);
 
         window.removeEventListener("scroll", handleScroll);
         document.removeEventListener("click", handleDocumentClick);
         document.removeEventListener("keydown", handleKeydownCart);
-        document.removeEventListener("keydown", handleKeydownAcct);
 
         window.removeEventListener("pointerup", handlePointerUp);
         window.removeEventListener("pointerup", handlePointerUpVendors);
@@ -658,7 +696,19 @@ export default function Home() {
         __html: `
         <header class="hdr" id="hdr"><div class="nav"><a class="logo" href="#top">khabo</a>
           <ul><li><a href="#why">Why Khabo</a></li><li><a href="#cats">Categories</a></li><li><a href="#vendors">Kitchens</a></li><li><a href="#sell">Sell with us</a></li></ul>
-          <div class="nr"><button class="bag" id="acct" aria-label="Sign in or create an account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg></button><button class="bag" id="bag" aria-label="Open bag">🛍<b id="bagN" data-n="0">0</b></button></div></div></header>
+          <div class="nr">
+            <div style="position:relative;">
+              <button class="bag" id="acct" aria-label="Profile" style="display:flex; align-items:center; gap:8px; padding: 0 12px; width:auto; border-radius:99px; font-weight:700;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:20px;height:20px;"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+                <span id="userNameDisplay" style="display:none; font-size:0.95rem;">User</span>
+              </button>
+              <div id="profileDropdown" style="display:none; position:absolute; top:120%; right:0; background:#fff; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); padding:8px; min-width:160px; flex-direction:column; gap:4px; z-index:100;">
+                <a href="/dashboard" style="padding:10px 14px; text-decoration:none; color:#333; font-weight:600; border-radius:8px; display:block;">👤 My Profile</a>
+                <button id="btnLogout" style="padding:10px 14px; border:none; background:none; text-align:left; width:100%; color:#e11d48; font-weight:600; cursor:pointer; border-radius:8px;">🚪 Logout</button>
+              </div>
+            </div>
+            <button class="bag" id="bag" aria-label="Open bag">🛍<b id="bagN" data-n="0">0</b></button>
+          </div></div></header>
 
         <main>
           <section class="hero" id="top">
